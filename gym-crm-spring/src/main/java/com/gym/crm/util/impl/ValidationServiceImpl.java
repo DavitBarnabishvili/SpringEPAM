@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.MonthDay;
 
 @Service
 public class ValidationServiceImpl implements ValidationService {
@@ -137,7 +138,9 @@ public class ValidationServiceImpl implements ValidationService {
         }
 
         int age = today.getYear() - dateOfBirth.getYear();
-        if (today.getDayOfYear() < dateOfBirth.getDayOfYear()) {
+        MonthDay birthMonthDay = MonthDay.from(dateOfBirth);
+        MonthDay todayMonthDay = MonthDay.from(today);
+        if (todayMonthDay.isBefore(birthMonthDay)) {
             age--;
         }
 
