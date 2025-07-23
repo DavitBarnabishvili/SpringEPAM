@@ -1,0 +1,12 @@
+{
+  "trainingTypes": [
+    {"id": 1, "trainingTypeName": "Cardio"},
+    {"id": 2, "trainingTypeName": "Strength"},
+    {"id": 3, "trainingTypeName": "Flexibility"},
+    {"id": 4, "trainingTypeName": "Yoga"},
+    {"id": 5, "trainingTypeName": "CrossFit"}
+  ],
+  "trainers": [],
+  "trainees": [],
+  "trainings": []
+}
