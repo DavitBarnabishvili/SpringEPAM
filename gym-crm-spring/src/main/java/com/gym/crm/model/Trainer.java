@@ -16,7 +16,7 @@ public class Trainer extends User {
     @Column(name = "UserId", nullable = false)
     private Long userId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "Specialization", referencedColumnName = "ID", nullable = false)
     private TrainingType specialization;
 

@@ -23,7 +23,7 @@ public class Training {
     @Column(name = "Training Name", nullable = false)
     private String trainingName;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "Training Type Id", referencedColumnName = "ID", nullable = false)
     private TrainingType trainingType;
 
