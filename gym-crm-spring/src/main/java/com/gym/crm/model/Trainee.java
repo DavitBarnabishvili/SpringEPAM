@@ -1,13 +1,26 @@
 package com.gym.crm.model;
 
+import jakarta.persistence.*;
 import java.time.LocalDate;
 import java.time.Period;
 import java.util.Objects;
 
+@Entity
+@Table(name = "Trainee")
 public class Trainee extends User {
 
+    @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    @Column(name = "ID")
+    private Long id;
+
+    @Column(name = "UserId", nullable = false)
     private Long userId;
+
+    @Column(name = "Date of Birth")
     private LocalDate dateOfBirth;
+
+    @Column(name = "Address")
     private String address;
 
     public Trainee() {
@@ -31,6 +44,14 @@ public class Trainee extends User {
         setUserId(userId);
         setDateOfBirth(dateOfBirth);
         setAddress(address);
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
     }
 
     public Long getUserId() {
@@ -78,9 +99,8 @@ public class Trainee extends User {
         if (o == null || getClass() != o.getClass()) return false;
         Trainee trainee = (Trainee) o;
 
-        // If both have userIds, compare by userId
-        if (this.userId != null && trainee.userId != null) {
-            return Objects.equals(userId, trainee.userId);
+        if (this.getId() != null && trainee.getId() != null) {
+            return Objects.equals(getId(), trainee.getId());
         }
 
         return super.equals(o);
@@ -88,8 +108,8 @@ public class Trainee extends User {
 
     @Override
     public int hashCode() {
-        if (userId != null) {
-            return userId.hashCode();
+        if (getId() != null) {
+            return getId().hashCode();
         }
 
         return super.hashCode();

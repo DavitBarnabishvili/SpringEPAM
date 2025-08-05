@@ -1,10 +1,18 @@
 package com.gym.crm.model;
 
+import jakarta.persistence.*;
 import java.util.Objects;
 
+@Entity
+@Table(name = "TrainingType")
 public class TrainingType {
 
+    @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    @Column(name = "ID")
     private Long id;
+
+    @Column(name = "Training Type Name", nullable = false)
     private String trainingTypeName;
 
     public TrainingType() {

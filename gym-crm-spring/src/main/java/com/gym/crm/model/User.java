@@ -1,13 +1,33 @@
 package com.gym.crm.model;
 
+import jakarta.persistence.*;
+
 import java.util.Objects;
 
+@Entity
+@Table(name = "User")
+//@Inheritance(strategy = InheritanceType.JOINED) I was going to go with this
+// but since this sets the id for Trainer and trainee, and we needed distrinct PK's i removed it.
 public abstract class User {
 
+    @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    @Column(name = "ID")
+    private Long id;
+
+    @Column(name = "First Name", nullable = false)
     private String firstName;
+
+    @Column(name = "Last Name", nullable = false)
     private String lastName;
+
+    @Column(name = "Username", nullable = false)
     private String username;
+
+    @Column(name = "Password", nullable = false)
     private String password;
+
+    @Column(name = "IsActive", nullable = false)
     private Boolean isActive;
 
     public User() {
@@ -104,5 +124,13 @@ public abstract class User {
                 ", username='" + username + '\'' +
                 ", isActive=" + isActive +
                 '}';
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public Long getId() {
+        return id;
     }
 }

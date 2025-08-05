@@ -1,10 +1,23 @@
 package com.gym.crm.model;
 
+import jakarta.persistence.*;
+
 import java.util.Objects;
 
+@Entity
+@Table(name = "Trainer")
 public class Trainer extends User {
 
+    @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    @Column(name = "ID")
+    private Long id;
+
+    @Column(name = "UserId", nullable = false)
     private Long userId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "Specialization", referencedColumnName = "ID", nullable = false)
     private TrainingType specialization;
 
     public Trainer() {
@@ -26,6 +39,14 @@ public class Trainer extends User {
         super(firstName, lastName, username, password, isActive);
         setUserId(userId);
         setSpecialization(specialization);
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
     }
 
     public Long getUserId() {
@@ -58,8 +79,8 @@ public class Trainer extends User {
         if (o == null || getClass() != o.getClass()) return false;
         Trainer trainer = (Trainer) o;
 
-        if (this.userId != null && trainer.userId != null) {
-            return Objects.equals(userId, trainer.userId);
+        if (this.getId() != null && trainer.getId() != null) {
+            return Objects.equals(getId(), trainer.getId());
         }
 
         return super.equals(o);
@@ -67,8 +88,8 @@ public class Trainer extends User {
 
     @Override
     public int hashCode() {
-        if (userId != null) {
-            return userId.hashCode();
+        if (getId() != null) {
+            return getId().hashCode();
         }
 
         return super.hashCode();

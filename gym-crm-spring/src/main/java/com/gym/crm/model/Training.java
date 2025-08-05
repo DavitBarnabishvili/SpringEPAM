@@ -1,17 +1,36 @@
 package com.gym.crm.model;
 
+import jakarta.persistence.*;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Objects;
 
+@Entity
+@Table(name = "Training")
 public class Training {
 
+    @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    @Column(name = "ID")
     private Long id;
+
+    @Column(name = "Trainee Id", nullable = false)
     private Long traineeId;
+
+    @Column(name = "Trainer Id", nullable = false)
     private Long trainerId;
+
+    @Column(name = "Training Name", nullable = false)
     private String trainingName;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "Training Type Id", referencedColumnName = "ID", nullable = false)
     private TrainingType trainingType;
+
+    @Column(name = "Training Date", nullable = false)
     private LocalDate trainingDate;
+
+    @Column(name = "Training Duration", nullable = false)
     private Integer trainingDuration;
 
     public Training() {
