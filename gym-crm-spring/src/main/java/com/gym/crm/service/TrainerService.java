@@ -27,7 +27,11 @@ public interface TrainerService {
      * @throws IllegalArgumentException if validation fails
      * @throws RuntimeException if trainer not found
      */
-    Trainer updateTrainer(Trainer trainer);
+    Trainer updateTrainer(String username, String password, Trainer trainer);
+
+    boolean activateTrainer(String username, String password, Long userId);
+
+    boolean deactivateTrainer(String username, String password, Long userId);
 
     /**
      * Finds a trainer by their userId.
