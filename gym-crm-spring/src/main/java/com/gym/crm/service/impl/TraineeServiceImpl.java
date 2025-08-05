@@ -2,7 +2,7 @@ package com.gym.crm.service.impl;
 
 import com.gym.crm.dao.TraineeDao;
 import com.gym.crm.dao.TrainingDao;
-import com.gym.crm.model.Trainee;
+import com.gym.crm.entity.Trainee;
 import com.gym.crm.service.TraineeService;
 import com.gym.crm.util.AuthenticationService;
 import com.gym.crm.util.CredentialsGeneratorService;
@@ -115,7 +115,6 @@ public class TraineeServiceImpl implements TraineeService {
         authenticationService.authenticateTrainee(username, password);
         authenticationService.validateTraineeAccess(username, userId);
 
-        // CASCADE DELETE: First delete all related trainings
         int deletedTrainings = trainingDao.deleteByTraineeId(userId);
         logger.info("Cascade deleted {} trainings for trainee: {}", deletedTrainings, userId);
 
@@ -256,7 +255,7 @@ public class TraineeServiceImpl implements TraineeService {
         if (trainee.isActive() == isActive) {
             String currentState = isActive ? "already active" : "already inactive";
             logger.warn("Trainee {} is {}, operation not performed", trainee.getFullName(), currentState);
-            return false; // Not idempotent - return false if already in desired state
+            return false;
         }
 
         trainee.setIsActive(isActive);

@@ -1,7 +1,7 @@
 package com.gym.crm.dao.impl;
 
 import com.gym.crm.dao.TraineeDao;
-import com.gym.crm.model.Trainee;
+import com.gym.crm.entity.Trainee;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Repository;
@@ -32,7 +32,7 @@ public class TraineeDaoImpl implements TraineeDao {
         logger.debug("Creating trainee: {}", trainee.getFullName());
 
         entityManager.persist(trainee);
-        entityManager.flush();
+        entityManager.flush(); // Ensure ID is generated
 
         logger.info("Successfully created trainee: {} with id: {}",
                 trainee.getFullName(), trainee.getId());

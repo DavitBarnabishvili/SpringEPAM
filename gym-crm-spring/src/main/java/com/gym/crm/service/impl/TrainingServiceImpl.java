@@ -3,7 +3,7 @@ package com.gym.crm.service.impl;
 import com.gym.crm.dao.TraineeDao;
 import com.gym.crm.dao.TrainerDao;
 import com.gym.crm.dao.TrainingDao;
-import com.gym.crm.model.Training;
+import com.gym.crm.entity.Training;
 import com.gym.crm.service.TrainingService;
 import com.gym.crm.util.AuthenticationService;
 import com.gym.crm.util.ValidationService;
@@ -70,12 +70,12 @@ public class TrainingServiceImpl implements TrainingService {
             throw new RuntimeException("Trainer not found with id: " + training.getTrainerId());
         }
 
-        Optional<com.gym.crm.model.Trainee> traineeOpt = traineeDao.findById(training.getTraineeId());
+        Optional<com.gym.crm.entity.Trainee> traineeOpt = traineeDao.findById(training.getTraineeId());
         if (traineeOpt.isPresent() && !traineeOpt.get().isActive()) {
             throw new IllegalArgumentException("Cannot create training for inactive trainee");
         }
 
-        Optional<com.gym.crm.model.Trainer> trainerOpt = trainerDao.findById(training.getTrainerId());
+        Optional<com.gym.crm.entity.Trainer> trainerOpt = trainerDao.findById(training.getTrainerId());
         if (trainerOpt.isPresent() && !trainerOpt.get().isActive()) {
             throw new IllegalArgumentException("Cannot create training for inactive trainer");
         }
@@ -129,7 +129,6 @@ public class TrainingServiceImpl implements TrainingService {
 
         logger.debug("Finding trainings for trainee: {}", traineeId);
 
-        // Authentication and authorization
         authenticationService.authenticateTrainee(username, password);
         authenticationService.validateTraineeAccess(username, traineeId);
 
@@ -149,7 +148,6 @@ public class TrainingServiceImpl implements TrainingService {
 
         logger.debug("Finding trainings for trainer: {}", trainerId);
 
-        // Authentication and authorization
         authenticationService.authenticateTrainer(username, password);
         authenticationService.validateTrainerAccess(username, trainerId);
 
@@ -212,7 +210,6 @@ public class TrainingServiceImpl implements TrainingService {
 
         logger.debug("Finding trainings for trainee {} between {} and {}", traineeId, startDate, endDate);
 
-        // Authentication and authorization
         authenticationService.authenticateTrainee(username, password);
         authenticationService.validateTraineeAccess(username, traineeId);
 
@@ -239,7 +236,6 @@ public class TrainingServiceImpl implements TrainingService {
 
         logger.debug("Finding trainings for trainer {} between {} and {}", trainerId, startDate, endDate);
 
-        // Authentication and authorization
         authenticationService.authenticateTrainer(username, password);
         authenticationService.validateTrainerAccess(username, trainerId);
 

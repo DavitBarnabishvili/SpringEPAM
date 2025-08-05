@@ -1,8 +1,8 @@
 package com.gym.crm.service.impl;
 
 import com.gym.crm.dao.TraineeDao;
-import com.gym.crm.model.Trainee;
-import com.gym.crm.model.Training;
+import com.gym.crm.entity.Trainee;
+import com.gym.crm.entity.Training;
 import com.gym.crm.util.ValidationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -36,13 +36,13 @@ class TrainingServiceImplTest {
     private ValidationService mockValidationService;
 
     private TrainingServiceImpl trainingService;
-    private com.gym.crm.model.Training testTraining;
+    private com.gym.crm.entity.Training testTraining;
 
     @BeforeEach
     void setUp() {
         trainingService = new TrainingServiceImpl(mockTrainingDao, mockTrainerDao, mockTraineeDao, mockValidationService);
-        com.gym.crm.model.TrainingType type = new com.gym.crm.model.TrainingType("Cardio");
-        testTraining = new com.gym.crm.model.Training(1L, 2L, "Morning Run", type, LocalDate.now(), 60);
+        com.gym.crm.entity.TrainingType type = new com.gym.crm.entity.TrainingType("Cardio");
+        testTraining = new com.gym.crm.entity.Training(1L, 2L, "Morning Run", type, LocalDate.now(), 60);
         testTraining.setId(1L);
     }
 
@@ -62,7 +62,7 @@ class TrainingServiceImplTest {
         activeTrainee.setIsActive(true);
         when(mockTraineeDao.findById(1L)).thenReturn(Optional.of(activeTrainee));
 
-        com.gym.crm.model.Trainer activeTrainer = new com.gym.crm.model.Trainer("Jane", "Smith");
+        com.gym.crm.entity.Trainer activeTrainer = new com.gym.crm.entity.Trainer("Jane", "Smith");
         activeTrainer.setIsActive(true);
         when(mockTrainerDao.findById(2L)).thenReturn(Optional.of(activeTrainer));
 
@@ -113,7 +113,7 @@ class TrainingServiceImplTest {
         activeTrainee.setIsActive(true);
         when(mockTraineeDao.findById(1L)).thenReturn(Optional.of(activeTrainee));
 
-        com.gym.crm.model.Trainer inactiveTrainer = new com.gym.crm.model.Trainer("Jane", "Smith");
+        com.gym.crm.entity.Trainer inactiveTrainer = new com.gym.crm.entity.Trainer("Jane", "Smith");
         inactiveTrainer.setIsActive(false);
         when(mockTrainerDao.findById(2L)).thenReturn(Optional.of(inactiveTrainer));
 
@@ -130,13 +130,13 @@ class TrainingServiceImplTest {
         activeTrainee.setIsActive(true);
         when(mockTraineeDao.findById(1L)).thenReturn(Optional.of(activeTrainee));
 
-        com.gym.crm.model.Trainer activeTrainer = new com.gym.crm.model.Trainer("Jane", "Smith");
+        com.gym.crm.entity.Trainer activeTrainer = new com.gym.crm.entity.Trainer("Jane", "Smith");
         activeTrainer.setIsActive(true);
         when(mockTrainerDao.findById(2L)).thenReturn(Optional.of(activeTrainer));
 
         when(mockTrainingDao.create(testTraining)).thenReturn(testTraining);
 
-        com.gym.crm.model.Training result = trainingService.createTraining(testTraining);
+        com.gym.crm.entity.Training result = trainingService.createTraining(testTraining);
 
         verify(mockTrainingDao).create(testTraining);
         assertEquals(testTraining, result);
@@ -145,7 +145,7 @@ class TrainingServiceImplTest {
     @Test
     @DisplayName("findTrainingById should return empty for null ID")
     void findTrainingById_WithNullId_ShouldReturnEmpty() {
-        Optional<com.gym.crm.model.Training> result = trainingService.findTrainingById(null);
+        Optional<com.gym.crm.entity.Training> result = trainingService.findTrainingById(null);
         assertTrue(result.isEmpty());
     }
 
@@ -154,7 +154,7 @@ class TrainingServiceImplTest {
     void findTrainingById_ShouldDelegateToDao() {
         when(mockTrainingDao.findById(1L)).thenReturn(Optional.of(testTraining));
 
-        Optional<com.gym.crm.model.Training> result = trainingService.findTrainingById(1L);
+        Optional<com.gym.crm.entity.Training> result = trainingService.findTrainingById(1L);
 
         assertTrue(result.isPresent());
         assertEquals(testTraining, result.get());
@@ -166,7 +166,7 @@ class TrainingServiceImplTest {
         List<Training> expectedTrainings = List.of(testTraining);
         when(mockTrainingDao.findAll()).thenReturn(expectedTrainings);
 
-        List<com.gym.crm.model.Training> result = trainingService.findAllTrainings();
+        List<com.gym.crm.entity.Training> result = trainingService.findAllTrainings();
 
         assertEquals(expectedTrainings, result);
     }
@@ -174,10 +174,10 @@ class TrainingServiceImplTest {
     @Test
     @DisplayName("findTrainingsByTraineeId should delegate to DAO")
     void findTrainingsByTraineeId_ShouldDelegateToDao() {
-        List<com.gym.crm.model.Training> expectedTrainings = List.of(testTraining);
+        List<com.gym.crm.entity.Training> expectedTrainings = List.of(testTraining);
         when(mockTrainingDao.findByTraineeId(1L)).thenReturn(expectedTrainings);
 
-        List<com.gym.crm.model.Training> result = trainingService.findTrainingsByTraineeId(1L);
+        List<com.gym.crm.entity.Training> result = trainingService.findTrainingsByTraineeId(1L);
 
         assertEquals(expectedTrainings, result);
     }
@@ -185,10 +185,10 @@ class TrainingServiceImplTest {
     @Test
     @DisplayName("findTrainingsByTrainerId should delegate to DAO")
     void findTrainingsByTrainerId_ShouldDelegateToDao() {
-        List<com.gym.crm.model.Training> expectedTrainings = List.of(testTraining);
+        List<com.gym.crm.entity.Training> expectedTrainings = List.of(testTraining);
         when(mockTrainingDao.findByTrainerId(2L)).thenReturn(expectedTrainings);
 
-        List<com.gym.crm.model.Training> result = trainingService.findTrainingsByTrainerId(2L);
+        List<com.gym.crm.entity.Training> result = trainingService.findTrainingsByTrainerId(2L);
 
         assertEquals(expectedTrainings, result);
     }
@@ -197,10 +197,10 @@ class TrainingServiceImplTest {
     @DisplayName("findTrainingsByDate should delegate to DAO")
     void findTrainingsByDate_ShouldDelegateToDao() {
         LocalDate date = LocalDate.now();
-        List<com.gym.crm.model.Training> expectedTrainings = List.of(testTraining);
+        List<com.gym.crm.entity.Training> expectedTrainings = List.of(testTraining);
         when(mockTrainingDao.findByDate(date)).thenReturn(expectedTrainings);
 
-        List<com.gym.crm.model.Training> result = trainingService.findTrainingsByDate(date);
+        List<com.gym.crm.entity.Training> result = trainingService.findTrainingsByDate(date);
 
         assertEquals(expectedTrainings, result);
     }
@@ -210,10 +210,10 @@ class TrainingServiceImplTest {
     void findTrainingsByDateRange_ShouldDelegateToDao() {
         LocalDate start = LocalDate.now();
         LocalDate end = start.plusDays(7);
-        List<com.gym.crm.model.Training> expectedTrainings = List.of(testTraining);
+        List<com.gym.crm.entity.Training> expectedTrainings = List.of(testTraining);
         when(mockTrainingDao.findByDateRange(start, end)).thenReturn(expectedTrainings);
 
-        List<com.gym.crm.model.Training> result = trainingService.findTrainingsByDateRange(start, end);
+        List<com.gym.crm.entity.Training> result = trainingService.findTrainingsByDateRange(start, end);
 
         assertEquals(expectedTrainings, result);
     }

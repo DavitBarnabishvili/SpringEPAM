@@ -1,6 +1,6 @@
 package com.gym.crm.util.impl;
 
-import com.gym.crm.model.Trainee;
+import com.gym.crm.entity.Trainee;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -38,7 +38,7 @@ class ValidationServiceImplTest {
     @Test
     @DisplayName("validateTrainer should validate first name")
     void validateTrainer_WithInvalidFirstName_ShouldThrowException() {
-        com.gym.crm.model.Trainer trainer = new com.gym.crm.model.Trainer(null, "Doe");
+        com.gym.crm.entity.Trainer trainer = new com.gym.crm.entity.Trainer(null, "Doe");
 
         assertThrows(IllegalArgumentException.class,
                 () -> validationService.validateTrainer(trainer));
@@ -47,7 +47,7 @@ class ValidationServiceImplTest {
     @Test
     @DisplayName("validateTrainer should validate last name")
     void validateTrainer_WithInvalidLastName_ShouldThrowException() {
-        com.gym.crm.model.Trainer trainer = new com.gym.crm.model.Trainer("John", "");
+        com.gym.crm.entity.Trainer trainer = new com.gym.crm.entity.Trainer("John", "");
 
         assertThrows(IllegalArgumentException.class,
                 () -> validationService.validateTrainer(trainer));
@@ -56,8 +56,8 @@ class ValidationServiceImplTest {
     @Test
     @DisplayName("validateTrainer should validate specialization")
     void validateTrainer_WithInvalidSpecialization_ShouldThrowException() {
-        com.gym.crm.model.TrainingType invalidType = new com.gym.crm.model.TrainingType("");
-        com.gym.crm.model.Trainer trainer = new com.gym.crm.model.Trainer("John", "Doe", invalidType);
+        com.gym.crm.entity.TrainingType invalidType = new com.gym.crm.entity.TrainingType("");
+        com.gym.crm.entity.Trainer trainer = new com.gym.crm.entity.Trainer("John", "Doe", invalidType);
 
         assertThrows(IllegalArgumentException.class,
                 () -> validationService.validateTrainer(trainer));
@@ -66,8 +66,8 @@ class ValidationServiceImplTest {
     @Test
     @DisplayName("validateTrainer should pass for valid trainer")
     void validateTrainer_WithValidTrainer_ShouldPass() {
-        com.gym.crm.model.TrainingType validType = new com.gym.crm.model.TrainingType("Cardio");
-        com.gym.crm.model.Trainer trainer = new com.gym.crm.model.Trainer("John", "Doe", validType);
+        com.gym.crm.entity.TrainingType validType = new com.gym.crm.entity.TrainingType("Cardio");
+        com.gym.crm.entity.Trainer trainer = new com.gym.crm.entity.Trainer("John", "Doe", validType);
 
         assertDoesNotThrow(() -> validationService.validateTrainer(trainer));
     }
@@ -75,7 +75,7 @@ class ValidationServiceImplTest {
     @Test
     @DisplayName("validateTrainer should allow null specialization")
     void validateTrainer_WithNullSpecialization_ShouldPass() {
-        com.gym.crm.model.Trainer trainer = new com.gym.crm.model.Trainer("John", "Doe");
+        com.gym.crm.entity.Trainer trainer = new com.gym.crm.entity.Trainer("John", "Doe");
 
         assertDoesNotThrow(() -> validationService.validateTrainer(trainer));
     }
@@ -152,8 +152,8 @@ class ValidationServiceImplTest {
     @Test
     @DisplayName("validateTraining should require trainee ID")
     void validateTraining_WithNullTraineeId_ShouldThrowException() {
-        com.gym.crm.model.Training training = new com.gym.crm.model.Training(
-                null, 2L, "Test", new com.gym.crm.model.TrainingType("Cardio"),
+        com.gym.crm.entity.Training training = new com.gym.crm.entity.Training(
+                null, 2L, "Test", new com.gym.crm.entity.TrainingType("Cardio"),
                 java.time.LocalDate.now(), 60);
 
         assertThrows(IllegalArgumentException.class,
@@ -163,8 +163,8 @@ class ValidationServiceImplTest {
     @Test
     @DisplayName("validateTraining should require trainer ID")
     void validateTraining_WithNullTrainerId_ShouldThrowException() {
-        com.gym.crm.model.Training training = new com.gym.crm.model.Training(
-                1L, null, "Test", new com.gym.crm.model.TrainingType("Cardio"),
+        com.gym.crm.entity.Training training = new com.gym.crm.entity.Training(
+                1L, null, "Test", new com.gym.crm.entity.TrainingType("Cardio"),
                 java.time.LocalDate.now(), 60);
 
         assertThrows(IllegalArgumentException.class,
@@ -174,8 +174,8 @@ class ValidationServiceImplTest {
     @Test
     @DisplayName("validateTraining should require training name")
     void validateTraining_WithNullTrainingName_ShouldThrowException() {
-        com.gym.crm.model.Training training = new com.gym.crm.model.Training(
-                1L, 2L, null, new com.gym.crm.model.TrainingType("Cardio"),
+        com.gym.crm.entity.Training training = new com.gym.crm.entity.Training(
+                1L, 2L, null, new com.gym.crm.entity.TrainingType("Cardio"),
                 java.time.LocalDate.now(), 60);
 
         assertThrows(IllegalArgumentException.class,
@@ -185,7 +185,7 @@ class ValidationServiceImplTest {
     @Test
     @DisplayName("validateTraining should require training type")
     void validateTraining_WithNullTrainingType_ShouldThrowException() {
-        com.gym.crm.model.Training training = new com.gym.crm.model.Training(
+        com.gym.crm.entity.Training training = new com.gym.crm.entity.Training(
                 1L, 2L, "Test", null, java.time.LocalDate.now(), 60);
 
         assertThrows(IllegalArgumentException.class,
@@ -195,8 +195,8 @@ class ValidationServiceImplTest {
     @Test
     @DisplayName("validateTraining should require training date")
     void validateTraining_WithNullTrainingDate_ShouldThrowException() {
-        com.gym.crm.model.Training training = new com.gym.crm.model.Training(
-                1L, 2L, "Test", new com.gym.crm.model.TrainingType("Cardio"), null, 60);
+        com.gym.crm.entity.Training training = new com.gym.crm.entity.Training(
+                1L, 2L, "Test", new com.gym.crm.entity.TrainingType("Cardio"), null, 60);
 
         assertThrows(IllegalArgumentException.class,
                 () -> validationService.validateTraining(training));
@@ -205,8 +205,8 @@ class ValidationServiceImplTest {
     @Test
     @DisplayName("validateTraining should validate duration when provided")
     void validateTraining_WithInvalidDuration_ShouldThrowException() {
-        com.gym.crm.model.Training training = new com.gym.crm.model.Training(
-                1L, 2L, "Test", new com.gym.crm.model.TrainingType("Cardio"),
+        com.gym.crm.entity.Training training = new com.gym.crm.entity.Training(
+                1L, 2L, "Test", new com.gym.crm.entity.TrainingType("Cardio"),
                 java.time.LocalDate.now(), 5);
 
         assertThrows(IllegalArgumentException.class,
@@ -216,8 +216,8 @@ class ValidationServiceImplTest {
     @Test
     @DisplayName("validateTraining should pass for valid training")
     void validateTraining_WithValidTraining_ShouldPass() {
-        com.gym.crm.model.Training training = new com.gym.crm.model.Training(
-                1L, 2L, "Test", new com.gym.crm.model.TrainingType("Cardio"),
+        com.gym.crm.entity.Training training = new com.gym.crm.entity.Training(
+                1L, 2L, "Test", new com.gym.crm.entity.TrainingType("Cardio"),
                 java.time.LocalDate.now(), 60);
 
         assertDoesNotThrow(() -> validationService.validateTraining(training));
@@ -226,8 +226,8 @@ class ValidationServiceImplTest {
     @Test
     @DisplayName("validateTraining should allow null duration")
     void validateTraining_WithNullDuration_ShouldPass() {
-        com.gym.crm.model.Training training = new com.gym.crm.model.Training(
-                1L, 2L, "Test", new com.gym.crm.model.TrainingType("Cardio"),
+        com.gym.crm.entity.Training training = new com.gym.crm.entity.Training(
+                1L, 2L, "Test", new com.gym.crm.entity.TrainingType("Cardio"),
                 java.time.LocalDate.now(), null);
 
         assertDoesNotThrow(() -> validationService.validateTraining(training));

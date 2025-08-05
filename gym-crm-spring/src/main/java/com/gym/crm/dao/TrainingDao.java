@@ -1,6 +1,6 @@
 package com.gym.crm.dao;
 
-import com.gym.crm.model.Training;
+import com.gym.crm.entity.Training;
 
 import java.time.LocalDate;
 import java.util.List;

@@ -1,7 +1,7 @@
 package com.gym.crm.dao.impl;
 
 import com.gym.crm.dao.TrainingDao;
-import com.gym.crm.model.Training;
+import com.gym.crm.entity.Training;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Repository;
@@ -241,7 +241,6 @@ public class TrainingDaoImpl implements TrainingDao {
         return exists;
     }
 
-    // Add method for cascade delete (needed for trainee deletion)
     public int deleteByTraineeId(Long traineeId) {
         if (traineeId == null) {
             return 0;

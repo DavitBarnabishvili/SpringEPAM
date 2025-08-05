@@ -1,4 +1,4 @@
-package com.gym.crm.model;
+package com.gym.crm.entity;
 
 import jakarta.persistence.*;
 import java.time.LocalDate;

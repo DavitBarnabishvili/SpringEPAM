@@ -1,13 +1,12 @@
-package com.gym.crm.model;
+package com.gym.crm.entity;
 
 import jakarta.persistence.*;
 
 import java.util.Objects;
 
 @Entity
-@Table(name = "User")
-//@Inheritance(strategy = InheritanceType.JOINED) I was going to go with this
-// but since this sets the id for Trainer and trainee, and we needed distrinct PK's i removed it.
+@Table(name = "Users")
+@Inheritance(strategy = InheritanceType.JOINED)
 public abstract class User {
 
     @Id

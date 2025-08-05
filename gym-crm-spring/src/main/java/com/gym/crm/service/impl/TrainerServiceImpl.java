@@ -1,8 +1,8 @@
 package com.gym.crm.service.impl;
 
 import com.gym.crm.dao.TrainerDao;
-import com.gym.crm.model.Trainer;
-import com.gym.crm.model.TrainingType;
+import com.gym.crm.entity.Trainer;
+import com.gym.crm.entity.TrainingType;
 import com.gym.crm.service.TrainerService;
 import com.gym.crm.util.AuthenticationService;
 import com.gym.crm.util.CredentialsGeneratorService;
@@ -76,6 +76,7 @@ public class TrainerServiceImpl implements TrainerService {
 
         logger.info("Updating trainer with id: {}", trainer.getId());
 
+        // Authentication and authorization
         authenticationService.authenticateTrainer(username, password);
         authenticationService.validateTrainerAccess(username, trainer.getId());
 
@@ -88,6 +89,7 @@ public class TrainerServiceImpl implements TrainerService {
 
         Trainer existingTrainer = existingTrainerOpt.get();
 
+        // Preserve credentials
         trainer.setUsername(existingTrainer.getUsername());
         trainer.setPassword(existingTrainer.getPassword());
 
@@ -131,11 +133,10 @@ public class TrainerServiceImpl implements TrainerService {
         }
 
         Trainer trainer = trainerOpt.get();
-
         if (trainer.isActive() == isActive) {
             String currentState = isActive ? "already active" : "already inactive";
             logger.warn("Trainer {} is {}, operation not performed", trainer.getFullName(), currentState);
-            return false; // Not idempotent - return false if already in desired state
+            return false;
         }
 
         trainer.setIsActive(isActive);
