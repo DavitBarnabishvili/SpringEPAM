@@ -1,7 +1,7 @@
 package com.gym.crm.util.impl;
 
-import com.gym.crm.model.Trainee;
-import com.gym.crm.model.Trainer;
+import com.gym.crm.entity.Trainee;
+import com.gym.crm.entity.Trainer;
 import com.gym.crm.storage.InMemoryStorage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

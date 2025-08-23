@@ -1,7 +1,7 @@
 package com.gym.crm.service.impl;
 
 
-import com.gym.crm.model.Trainer;
+import com.gym.crm.entity.Trainer;
 import com.gym.crm.util.CredentialsGeneratorService;
 import com.gym.crm.util.ValidationService;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,13 +35,13 @@ class TrainerServiceImplTest {
     private ValidationService mockValidationService;
 
     private TrainerServiceImpl trainerService;
-    private com.gym.crm.model.Trainer testTrainer;
+    private com.gym.crm.entity.Trainer testTrainer;
 
     @BeforeEach
     void setUp() {
         trainerService = new TrainerServiceImpl(mockTrainerDao, mockCredentialsGenerator, mockValidationService);
-        com.gym.crm.model.TrainingType specialization = new com.gym.crm.model.TrainingType("Cardio");
-        testTrainer = new com.gym.crm.model.Trainer("Jane", "Smith", specialization);
+        com.gym.crm.entity.TrainingType specialization = new com.gym.crm.entity.TrainingType("Cardio");
+        testTrainer = new com.gym.crm.entity.Trainer("Jane", "Smith", specialization);
         testTrainer.setUserId(1L);
         testTrainer.setUsername("jane.smith");
         testTrainer.setPassword("password456");
@@ -56,10 +56,10 @@ class TrainerServiceImplTest {
     @Test
     @DisplayName("createTrainer should validate trainer")
     void createTrainer_ShouldValidateTrainer() {
-        com.gym.crm.model.Trainer newTrainer = new com.gym.crm.model.Trainer("John", "Doe");
+        com.gym.crm.entity.Trainer newTrainer = new com.gym.crm.entity.Trainer("John", "Doe");
         when(mockCredentialsGenerator.generateUsername("John", "Doe")).thenReturn("john.doe");
         when(mockCredentialsGenerator.generatePassword()).thenReturn("password123");
-        when(mockTrainerDao.create(any(com.gym.crm.model.Trainer.class))).thenReturn(newTrainer);
+        when(mockTrainerDao.create(any(com.gym.crm.entity.Trainer.class))).thenReturn(newTrainer);
 
         trainerService.createTrainer(newTrainer);
 
@@ -69,10 +69,10 @@ class TrainerServiceImplTest {
     @Test
     @DisplayName("createTrainer should generate credentials")
     void createTrainer_ShouldGenerateCredentials() {
-        com.gym.crm.model.Trainer newTrainer = new com.gym.crm.model.Trainer("John", "Doe");
+        com.gym.crm.entity.Trainer newTrainer = new com.gym.crm.entity.Trainer("John", "Doe");
         when(mockCredentialsGenerator.generateUsername("John", "Doe")).thenReturn("john.doe");
         when(mockCredentialsGenerator.generatePassword()).thenReturn("password123");
-        when(mockTrainerDao.create(any(com.gym.crm.model.Trainer.class))).thenReturn(newTrainer);
+        when(mockTrainerDao.create(any(com.gym.crm.entity.Trainer.class))).thenReturn(newTrainer);
 
         trainerService.createTrainer(newTrainer);
 
@@ -86,12 +86,12 @@ class TrainerServiceImplTest {
     @Test
     @DisplayName("createTrainer should save trainer via DAO")
     void createTrainer_ShouldSaveTrainerViaDao() {
-        com.gym.crm.model.Trainer newTrainer = new com.gym.crm.model.Trainer("John", "Doe");
+        com.gym.crm.entity.Trainer newTrainer = new com.gym.crm.entity.Trainer("John", "Doe");
         when(mockCredentialsGenerator.generateUsername(anyString(), anyString())).thenReturn("john.doe");
         when(mockCredentialsGenerator.generatePassword()).thenReturn("password123");
         when(mockTrainerDao.create(newTrainer)).thenReturn(newTrainer);
 
-        com.gym.crm.model.Trainer result = trainerService.createTrainer(newTrainer);
+        com.gym.crm.entity.Trainer result = trainerService.createTrainer(newTrainer);
 
         verify(mockTrainerDao).create(newTrainer);
         assertEquals(newTrainer, result);
@@ -106,7 +106,7 @@ class TrainerServiceImplTest {
     @Test
     @DisplayName("updateTrainer should throw exception when trainer has no ID")
     void updateTrainer_WithoutId_ShouldThrowException() {
-        com.gym.crm.model.Trainer trainerWithoutId = new com.gym.crm.model.Trainer("John", "Doe");
+        com.gym.crm.entity.Trainer trainerWithoutId = new com.gym.crm.entity.Trainer("John", "Doe");
 
         assertThrows(IllegalArgumentException.class, () -> trainerService.updateTrainer(trainerWithoutId));
     }
@@ -122,13 +122,13 @@ class TrainerServiceImplTest {
     @Test
     @DisplayName("updateTrainer should preserve credentials")
     void updateTrainer_ShouldPreserveCredentials() {
-        com.gym.crm.model.Trainer existingTrainer = new com.gym.crm.model.Trainer("Jane", "Smith");
+        com.gym.crm.entity.Trainer existingTrainer = new com.gym.crm.entity.Trainer("Jane", "Smith");
         existingTrainer.setUserId(1L);
         existingTrainer.setUsername("jane.smith");
         existingTrainer.setPassword("original.password");
 
-        com.gym.crm.model.TrainingType newSpecialization = new com.gym.crm.model.TrainingType("Strength");
-        com.gym.crm.model.Trainer updatedTrainer = new com.gym.crm.model.Trainer("Jane", "Smith", newSpecialization);
+        com.gym.crm.entity.TrainingType newSpecialization = new com.gym.crm.entity.TrainingType("Strength");
+        com.gym.crm.entity.Trainer updatedTrainer = new com.gym.crm.entity.Trainer("Jane", "Smith", newSpecialization);
         updatedTrainer.setUserId(1L);
 
         when(mockTrainerDao.findById(1L)).thenReturn(Optional.of(existingTrainer));
@@ -144,7 +144,7 @@ class TrainerServiceImplTest {
     @Test
     @DisplayName("findTrainerById should return empty for null ID")
     void findTrainerById_WithNullId_ShouldReturnEmpty() {
-        Optional<com.gym.crm.model.Trainer> result = trainerService.findTrainerById(null);
+        Optional<com.gym.crm.entity.Trainer> result = trainerService.findTrainerById(null);
         assertTrue(result.isEmpty());
     }
 
@@ -153,7 +153,7 @@ class TrainerServiceImplTest {
     void findTrainerById_ShouldDelegateToDao() {
         when(mockTrainerDao.findById(1L)).thenReturn(Optional.of(testTrainer));
 
-        Optional<com.gym.crm.model.Trainer> result = trainerService.findTrainerById(1L);
+        Optional<com.gym.crm.entity.Trainer> result = trainerService.findTrainerById(1L);
 
         assertTrue(result.isPresent());
         assertEquals(testTrainer, result.get());
@@ -164,7 +164,7 @@ class TrainerServiceImplTest {
     void findTrainerByUsername_ShouldDelegateToDao() {
         when(mockTrainerDao.findByUsername("jane.smith")).thenReturn(Optional.of(testTrainer));
 
-        Optional<com.gym.crm.model.Trainer> result = trainerService.findTrainerByUsername("jane.smith");
+        Optional<com.gym.crm.entity.Trainer> result = trainerService.findTrainerByUsername("jane.smith");
 
         assertTrue(result.isPresent());
         assertEquals(testTrainer, result.get());
@@ -176,7 +176,7 @@ class TrainerServiceImplTest {
         List<Trainer> expectedTrainers = List.of(testTrainer);
         when(mockTrainerDao.findAll()).thenReturn(expectedTrainers);
 
-        List<com.gym.crm.model.Trainer> result = trainerService.findAllTrainers();
+        List<com.gym.crm.entity.Trainer> result = trainerService.findAllTrainers();
 
         assertEquals(expectedTrainers, result);
     }
@@ -184,22 +184,22 @@ class TrainerServiceImplTest {
     @Test
     @DisplayName("findTrainersBySpecialization should return empty for null specialization")
     void findTrainersBySpecialization_WithNullSpecialization_ShouldReturnEmpty() {
-        List<com.gym.crm.model.Trainer> result = trainerService.findTrainersBySpecialization(null);
+        List<com.gym.crm.entity.Trainer> result = trainerService.findTrainersBySpecialization(null);
         assertTrue(result.isEmpty());
     }
 
     @Test
     @DisplayName("findTrainersBySpecialization should filter by specialization")
     void findTrainersBySpecialization_ShouldFilterBySpecialization() {
-        com.gym.crm.model.TrainingType cardio = new com.gym.crm.model.TrainingType("Cardio");
-        com.gym.crm.model.TrainingType strength = new com.gym.crm.model.TrainingType("Strength");
+        com.gym.crm.entity.TrainingType cardio = new com.gym.crm.entity.TrainingType("Cardio");
+        com.gym.crm.entity.TrainingType strength = new com.gym.crm.entity.TrainingType("Strength");
 
-        com.gym.crm.model.Trainer cardioTrainer = new com.gym.crm.model.Trainer("John", "Cardio", cardio);
-        com.gym.crm.model.Trainer strengthTrainer = new com.gym.crm.model.Trainer("Jane", "Strength", strength);
+        com.gym.crm.entity.Trainer cardioTrainer = new com.gym.crm.entity.Trainer("John", "Cardio", cardio);
+        com.gym.crm.entity.Trainer strengthTrainer = new com.gym.crm.entity.Trainer("Jane", "Strength", strength);
 
         when(mockTrainerDao.findAll()).thenReturn(List.of(cardioTrainer, strengthTrainer));
 
-        List<com.gym.crm.model.Trainer> result = trainerService.findTrainersBySpecialization(cardio);
+        List<com.gym.crm.entity.Trainer> result = trainerService.findTrainersBySpecialization(cardio);
 
         assertEquals(1, result.size());
         assertEquals(cardioTrainer, result.getFirst());

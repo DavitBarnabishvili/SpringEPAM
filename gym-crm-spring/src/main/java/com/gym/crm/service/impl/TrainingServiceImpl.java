@@ -3,8 +3,9 @@ package com.gym.crm.service.impl;
 import com.gym.crm.dao.TraineeDao;
 import com.gym.crm.dao.TrainerDao;
 import com.gym.crm.dao.TrainingDao;
-import com.gym.crm.model.Training;
+import com.gym.crm.entity.Training;
 import com.gym.crm.service.TrainingService;
+import com.gym.crm.util.AuthenticationService;
 import com.gym.crm.util.ValidationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,24 +19,27 @@ import java.util.Optional;
 public class TrainingServiceImpl implements TrainingService {
 
     private static final Logger logger = LoggerFactory.getLogger(TrainingServiceImpl.class);
+
     private final TrainingDao trainingDao;
     private final TrainerDao trainerDao;
     private final TraineeDao traineeDao;
+    private final AuthenticationService authenticationService;
     private final ValidationService validationService;
-
 
     public TrainingServiceImpl(TrainingDao trainingDao,
                                TrainerDao trainerDao,
                                TraineeDao traineeDao,
+                               AuthenticationService authenticationService,
                                ValidationService validationService) {
         this.trainingDao = trainingDao;
         this.trainerDao = trainerDao;
         this.traineeDao = traineeDao;
+        this.authenticationService = authenticationService;
         this.validationService = validationService;
     }
 
     @Override
-    public Training createTraining(Training training) {
+    public Training createTraining(String username, String password, Training training) {
         if (training == null) {
             throw new IllegalArgumentException("Training cannot be null");
         }
@@ -43,22 +47,35 @@ public class TrainingServiceImpl implements TrainingService {
         logger.info("Creating training: '{}' for trainee {} and trainer {}",
                 training.getTrainingName(), training.getTraineeId(), training.getTrainerId());
 
+        boolean isTraineeAuth = authenticationService.isValidTraineeCredentials(username, password);
+        boolean isTrainerAuth = authenticationService.isValidTrainerCredentials(username, password);
+
+        if (!isTraineeAuth && !isTrainerAuth) {
+            throw new SecurityException("Authentication failed");
+        }
+
+        if (isTraineeAuth) {
+            authenticationService.validateTraineeAccess(username, training.getTraineeId());
+        } else {
+            authenticationService.validateTrainerAccess(username, training.getTrainerId());
+        }
+
         validationService.validateTraining(training);
 
         if (!traineeDao.existsById(training.getTraineeId())) {
-            throw new RuntimeException("Trainee not found with userId: " + training.getTraineeId());
+            throw new RuntimeException("Trainee not found with id: " + training.getTraineeId());
         }
 
         if (!trainerDao.existsById(training.getTrainerId())) {
-            throw new RuntimeException("Trainer not found with userId: " + training.getTrainerId());
+            throw new RuntimeException("Trainer not found with id: " + training.getTrainerId());
         }
 
-        Optional<com.gym.crm.model.Trainee> traineeOpt = traineeDao.findById(training.getTraineeId());
+        Optional<com.gym.crm.entity.Trainee> traineeOpt = traineeDao.findById(training.getTraineeId());
         if (traineeOpt.isPresent() && !traineeOpt.get().isActive()) {
             throw new IllegalArgumentException("Cannot create training for inactive trainee");
         }
 
-        Optional<com.gym.crm.model.Trainer> trainerOpt = trainerDao.findById(training.getTrainerId());
+        Optional<com.gym.crm.entity.Trainer> trainerOpt = trainerDao.findById(training.getTrainerId());
         if (trainerOpt.isPresent() && !trainerOpt.get().isActive()) {
             throw new IllegalArgumentException("Cannot create training for inactive trainer");
         }
@@ -104,13 +121,16 @@ public class TrainingServiceImpl implements TrainingService {
     }
 
     @Override
-    public List<Training> findTrainingsByTraineeId(Long traineeId) {
+    public List<Training> findTrainingsByTraineeId(String username, String password, Long traineeId) {
         if (traineeId == null) {
             logger.debug("FindTrainingsByTraineeId called with null traineeId");
             return List.of();
         }
 
         logger.debug("Finding trainings for trainee: {}", traineeId);
+
+        authenticationService.authenticateTrainee(username, password);
+        authenticationService.validateTraineeAccess(username, traineeId);
 
         List<Training> trainings = trainingDao.findByTraineeId(traineeId);
 
@@ -120,13 +140,16 @@ public class TrainingServiceImpl implements TrainingService {
     }
 
     @Override
-    public List<Training> findTrainingsByTrainerId(Long trainerId) {
+    public List<Training> findTrainingsByTrainerId(String username, String password, Long trainerId) {
         if (trainerId == null) {
             logger.debug("FindTrainingsByTrainerId called with null trainerId");
             return List.of();
         }
 
         logger.debug("Finding trainings for trainer: {}", trainerId);
+
+        authenticationService.authenticateTrainer(username, password);
+        authenticationService.validateTrainerAccess(username, trainerId);
 
         List<Training> trainings = trainingDao.findByTrainerId(trainerId);
 
@@ -173,7 +196,7 @@ public class TrainingServiceImpl implements TrainingService {
     }
 
     @Override
-    public List<Training> findTraineeTrainingsByDateRange(Long traineeId, LocalDate startDate, LocalDate endDate) {
+    public List<Training> findTraineeTrainingsByDateRange(String username, String password, Long traineeId, LocalDate startDate, LocalDate endDate) {
         if (traineeId == null || startDate == null || endDate == null) {
             logger.debug("FindTraineeTrainingsByDateRange called with null parameters: traineeId={}, start={}, end={}",
                     traineeId, startDate, endDate);
@@ -187,6 +210,9 @@ public class TrainingServiceImpl implements TrainingService {
 
         logger.debug("Finding trainings for trainee {} between {} and {}", traineeId, startDate, endDate);
 
+        authenticationService.authenticateTrainee(username, password);
+        authenticationService.validateTraineeAccess(username, traineeId);
+
         List<Training> trainings = trainingDao.findByTraineeIdAndDateRange(traineeId, startDate, endDate);
 
         logger.debug("Found {} trainings for trainee {} between {} and {}",
@@ -196,7 +222,7 @@ public class TrainingServiceImpl implements TrainingService {
     }
 
     @Override
-    public List<Training> findTrainerTrainingsByDateRange(Long trainerId, LocalDate startDate, LocalDate endDate) {
+    public List<Training> findTrainerTrainingsByDateRange(String username, String password, Long trainerId, LocalDate startDate, LocalDate endDate) {
         if (trainerId == null || startDate == null || endDate == null) {
             logger.debug("FindTrainerTrainingsByDateRange called with null parameters: trainerId={}, start={}, end={}",
                     trainerId, startDate, endDate);
@@ -209,6 +235,9 @@ public class TrainingServiceImpl implements TrainingService {
         }
 
         logger.debug("Finding trainings for trainer {} between {} and {}", trainerId, startDate, endDate);
+
+        authenticationService.authenticateTrainer(username, password);
+        authenticationService.validateTrainerAccess(username, trainerId);
 
         List<Training> trainings = trainingDao.findByTrainerIdAndDateRange(trainerId, startDate, endDate);
 

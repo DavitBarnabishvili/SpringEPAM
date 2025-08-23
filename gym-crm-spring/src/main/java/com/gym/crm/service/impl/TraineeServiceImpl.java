@@ -1,8 +1,10 @@
 package com.gym.crm.service.impl;
 
 import com.gym.crm.dao.TraineeDao;
-import com.gym.crm.model.Trainee;
+import com.gym.crm.dao.TrainingDao;
+import com.gym.crm.entity.Trainee;
 import com.gym.crm.service.TraineeService;
+import com.gym.crm.util.AuthenticationService;
 import com.gym.crm.util.CredentialsGeneratorService;
 import com.gym.crm.util.ValidationService;
 import org.slf4j.Logger;
@@ -20,13 +22,19 @@ public class TraineeServiceImpl implements TraineeService {
     private static final Logger logger = LoggerFactory.getLogger(TraineeServiceImpl.class);
 
     private final TraineeDao traineeDao;
+    private final TrainingDao trainingDao;
+    private final AuthenticationService authenticationService;
     private final CredentialsGeneratorService credentialsGenerator;
     private final ValidationService validationService;
 
     public TraineeServiceImpl(TraineeDao traineeDao,
+                              TrainingDao trainingDao,
+                              AuthenticationService authenticationService,
                               CredentialsGeneratorService credentialsGenerator,
                               ValidationService validationService) {
         this.traineeDao = traineeDao;
+        this.trainingDao = trainingDao;
+        this.authenticationService = authenticationService;
         this.credentialsGenerator = credentialsGenerator;
         this.validationService = validationService;
     }
@@ -54,58 +62,68 @@ public class TraineeServiceImpl implements TraineeService {
 
         Trainee savedTrainee = traineeDao.create(trainee);
 
-        logger.info("Successfully created trainee: {} with username: {} and userId: {}",
-                savedTrainee.getFullName(), savedTrainee.getUsername(), savedTrainee.getUserId());
+        logger.info("Successfully created trainee: {} with username: {} and id: {}",
+                savedTrainee.getFullName(), savedTrainee.getUsername(), savedTrainee.getId());
 
         return savedTrainee;
     }
 
     @Override
-    public Trainee updateTrainee(Trainee trainee) {
+    public Trainee updateTrainee(String username, String password, Trainee trainee) {
         if (trainee == null) {
             throw new IllegalArgumentException("Trainee cannot be null");
         }
 
-        if (trainee.getUserId() == null) {
-            throw new IllegalArgumentException("Trainee userId is required for update");
+        if (trainee.getId() == null) {
+            throw new IllegalArgumentException("Trainee id is required for update");
         }
 
-        logger.info("Updating trainee with userId: {}", trainee.getUserId());
+        logger.info("Updating trainee with id: {}", trainee.getId());
+
+        authenticationService.authenticateTrainee(username, password);
+        authenticationService.validateTraineeAccess(username, trainee.getId());
 
         validationService.validateTrainee(trainee);
 
-        Optional<Trainee> existingTraineeOpt = traineeDao.findById(trainee.getUserId());
+        Optional<Trainee> existingTraineeOpt = traineeDao.findById(trainee.getId());
         if (existingTraineeOpt.isEmpty()) {
-            throw new RuntimeException("Trainee not found with userId: " + trainee.getUserId());
+            throw new RuntimeException("Trainee not found with id: " + trainee.getId());
         }
 
         Trainee existingTrainee = existingTraineeOpt.get();
 
         trainee.setUsername(existingTrainee.getUsername());
         trainee.setPassword(existingTrainee.getPassword());
+
         Trainee updatedTrainee = traineeDao.update(trainee);
 
-        logger.info("Successfully updated trainee: {} with userId: {}",
-                updatedTrainee.getFullName(), updatedTrainee.getUserId());
+        logger.info("Successfully updated trainee: {} with id: {}",
+                updatedTrainee.getFullName(), updatedTrainee.getId());
 
         return updatedTrainee;
     }
 
     @Override
-    public boolean deleteTrainee(Long userId) {
+    public boolean deleteTrainee(String username, String password, Long userId) {
         if (userId == null) {
             logger.debug("DeleteTrainee called with null userId");
             return false;
         }
 
-        logger.info("Deleting trainee with userId: {}", userId);
+        logger.info("Deleting trainee with id: {}", userId);
+
+        authenticationService.authenticateTrainee(username, password);
+        authenticationService.validateTraineeAccess(username, userId);
+
+        int deletedTrainings = trainingDao.deleteByTraineeId(userId);
+        logger.info("Cascade deleted {} trainings for trainee: {}", deletedTrainings, userId);
 
         boolean deleted = traineeDao.delete(userId);
 
         if (deleted) {
-            logger.info("Successfully deleted trainee with userId: {}", userId);
+            logger.info("Successfully deleted trainee with id: {} and {} related trainings", userId, deletedTrainings);
         } else {
-            logger.debug("No trainee found with userId: {} for deletion", userId);
+            logger.debug("No trainee found with id: {} for deletion", userId);
         }
 
         return deleted;
@@ -118,14 +136,14 @@ public class TraineeServiceImpl implements TraineeService {
             return Optional.empty();
         }
 
-        logger.debug("Finding trainee by userId: {}", userId);
+        logger.debug("Finding trainee by id: {}", userId);
 
         Optional<Trainee> result = traineeDao.findById(userId);
 
         if (result.isPresent()) {
             logger.debug("Found trainee: {}", result.get().getFullName());
         } else {
-            logger.debug("No trainee found with userId: {}", userId);
+            logger.debug("No trainee found with id: {}", userId);
         }
 
         return result;
@@ -202,15 +220,20 @@ public class TraineeServiceImpl implements TraineeService {
     }
 
     @Override
-    public boolean activateTrainee(Long userId) {
+    public boolean activateTrainee(String username, String password, Long userId) {
+        authenticationService.authenticateTrainee(username, password);
+        authenticationService.validateTraineeAccess(username, userId);
+
         return updateTraineeActiveStatus(userId, true);
     }
 
     @Override
-    public boolean deactivateTrainee(Long userId) {
+    public boolean deactivateTrainee(String username, String password, Long userId) {
+        authenticationService.authenticateTrainee(username, password);
+        authenticationService.validateTraineeAccess(username, userId);
+
         return updateTraineeActiveStatus(userId, false);
     }
-
 
     private boolean updateTraineeActiveStatus(Long userId, boolean isActive) {
         if (userId == null) {
@@ -219,15 +242,22 @@ public class TraineeServiceImpl implements TraineeService {
         }
 
         String action = isActive ? "Activating" : "Deactivating";
-        logger.info("{} trainee with userId: {}", action, userId);
+        logger.info("{} trainee with id: {}", action, userId);
 
         Optional<Trainee> traineeOpt = traineeDao.findById(userId);
         if (traineeOpt.isEmpty()) {
-            logger.debug("No trainee found with userId: {} for status update", userId);
+            logger.debug("No trainee found with id: {} for status update", userId);
             return false;
         }
 
         Trainee trainee = traineeOpt.get();
+
+        if (trainee.isActive() == isActive) {
+            String currentState = isActive ? "already active" : "already inactive";
+            logger.warn("Trainee {} is {}, operation not performed", trainee.getFullName(), currentState);
+            return false;
+        }
+
         trainee.setIsActive(isActive);
 
         try {
@@ -237,7 +267,7 @@ public class TraineeServiceImpl implements TraineeService {
             return true;
         } catch (Exception e) {
             action = isActive ? "Activate" : "Deactivate";
-            logger.error("Failed to {} trainee with userId: {}", action.toLowerCase(), userId, e);
+            logger.error("Failed to {} trainee with id: {}", action.toLowerCase(), userId, e);
             return false;
         }
     }
@@ -249,7 +279,7 @@ public class TraineeServiceImpl implements TraineeService {
         }
 
         boolean exists = traineeDao.existsById(userId);
-        logger.debug("Trainee exists check for userId {}: {}", userId, exists);
+        logger.debug("Trainee exists check for id {}: {}", userId, exists);
 
         return exists;
     }

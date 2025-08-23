@@ -1,6 +1,6 @@
 package com.gym.crm.dao.impl;
 
-import com.gym.crm.model.Trainee;
+import com.gym.crm.entity.Trainee;
 import com.gym.crm.storage.InMemoryStorage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

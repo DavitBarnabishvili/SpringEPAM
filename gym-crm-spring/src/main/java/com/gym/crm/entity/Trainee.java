@@ -1,13 +1,18 @@
-package com.gym.crm.model;
+package com.gym.crm.entity;
 
+import jakarta.persistence.*;
 import java.time.LocalDate;
 import java.time.Period;
 import java.util.Objects;
 
-public class Trainee extends User {
+@Entity
+@Table(name = "Trainee")
+public class Trainee extends User {  // JOINED inheritance
 
-    private Long userId;
+    @Column(name = "Date of Birth")
     private LocalDate dateOfBirth;
+
+    @Column(name = "Address")
     private String address;
 
     public Trainee() {
@@ -24,21 +29,11 @@ public class Trainee extends User {
         setAddress(address);
     }
 
-    // Full constructor - for internal use
-    public Trainee(Long userId, String firstName, String lastName, String username,
+    public Trainee(String firstName, String lastName, String username,
                    String password, Boolean isActive, LocalDate dateOfBirth, String address) {
         super(firstName, lastName, username, password, isActive);
-        setUserId(userId);
         setDateOfBirth(dateOfBirth);
         setAddress(address);
-    }
-
-    public Long getUserId() {
-        return userId;
-    }
-
-    public void setUserId(Long userId) {
-        this.userId = userId;
     }
 
     public LocalDate getDateOfBirth() {
@@ -76,22 +71,11 @@ public class Trainee extends User {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        Trainee trainee = (Trainee) o;
-
-        // If both have userIds, compare by userId
-        if (this.userId != null && trainee.userId != null) {
-            return Objects.equals(userId, trainee.userId);
-        }
-
         return super.equals(o);
     }
 
     @Override
     public int hashCode() {
-        if (userId != null) {
-            return userId.hashCode();
-        }
-
         return super.hashCode();
     }
 

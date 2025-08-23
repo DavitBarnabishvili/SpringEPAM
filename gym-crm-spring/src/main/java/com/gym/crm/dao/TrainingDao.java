@@ -1,6 +1,6 @@
 package com.gym.crm.dao;
 
-import com.gym.crm.model.Training;
+import com.gym.crm.entity.Training;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -93,4 +93,7 @@ public interface TrainingDao {
      * @return true if training exists, false otherwise
      */
     boolean existsById(Long id);
+
+    // Add method for cascade delete (needed for trainee deletion)
+    int deleteByTraineeId(Long traineeId);
 }

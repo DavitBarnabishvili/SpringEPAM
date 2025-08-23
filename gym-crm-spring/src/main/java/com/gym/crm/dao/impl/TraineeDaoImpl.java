@@ -1,26 +1,27 @@
 package com.gym.crm.dao.impl;
 
 import com.gym.crm.dao.TraineeDao;
-import com.gym.crm.model.Trainee;
-import com.gym.crm.storage.InMemoryStorage;
+import com.gym.crm.entity.Trainee;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.NoResultException;
+import jakarta.persistence.PersistenceContext;
+import jakarta.persistence.TypedQuery;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Repository
+@Transactional
 public class TraineeDaoImpl implements TraineeDao {
 
     private static final Logger logger = LoggerFactory.getLogger(TraineeDaoImpl.class);
 
-    private final InMemoryStorage storage;
-
-    public TraineeDaoImpl(InMemoryStorage storage) {
-        this.storage = storage;
-    }
+    @PersistenceContext
+    private EntityManager entityManager;
 
     @Override
     public Trainee create(Trainee trainee) {
@@ -30,19 +31,11 @@ public class TraineeDaoImpl implements TraineeDao {
 
         logger.debug("Creating trainee: {}", trainee.getFullName());
 
-        Long id = trainee.getUserId();
-        String fullName = trainee.getFullName();
+        entityManager.persist(trainee);
+        entityManager.flush(); // Ensure ID is generated
 
-        if (id == null) {
-            id = storage.generateTraineeId();
-            trainee.setUserId(id);
-            logger.debug("Assigned userId {} to trainee {}", id, fullName);
-        }
-
-        storage.storeTrainee(id, trainee);
-
-        logger.info("Successfully created trainee: {} with userId: {}",
-                fullName, id);
+        logger.info("Successfully created trainee: {} with id: {}",
+                trainee.getFullName(), trainee.getId());
 
         return trainee;
     }
@@ -53,24 +46,18 @@ public class TraineeDaoImpl implements TraineeDao {
             throw new IllegalArgumentException("Trainee cannot be null");
         }
 
-        Long id = trainee.getUserId();
-
-        if (id == null) {
-            throw new IllegalArgumentException("Trainee userId cannot be null for update");
+        if (trainee.getId() == null) {
+            throw new IllegalArgumentException("Trainee id cannot be null for update");
         }
 
-        logger.debug("Updating trainee with userId: {}", id);
+        logger.debug("Updating trainee with id: {}", trainee.getId());
 
-        if (!storage.getTrainees().containsKey(id)) {
-            throw new RuntimeException("Trainee not found with userId: " + id);
-        }
+        Trainee updatedTrainee = entityManager.merge(trainee);
 
-        storage.storeTrainee(id, trainee);
+        logger.info("Successfully updated trainee: {} with id: {}",
+                updatedTrainee.getFullName(), updatedTrainee.getId());
 
-        logger.info("Successfully updated trainee: {} with userId: {}",
-                trainee.getFullName(), id);
-
-        return trainee;
+        return updatedTrainee;
     }
 
     @Override
@@ -80,54 +67,57 @@ public class TraineeDaoImpl implements TraineeDao {
             return false;
         }
 
-        logger.debug("Deleting trainee with userId: {}", userId);
+        logger.debug("Deleting trainee with id: {}", userId);
 
-        Trainee existingTrainee = storage.getTrainee(userId);
-        if (existingTrainee == null) {
-            logger.debug("No trainee found with userId: {} for deletion", userId);
+        Trainee trainee = entityManager.find(Trainee.class, userId);
+        if (trainee == null) {
+            logger.debug("No trainee found with id: {} for deletion", userId);
             return false;
         }
 
-        storage.removeTrainee(userId);
+        entityManager.remove(trainee);
 
-        logger.info("Successfully deleted trainee: {} with userId: {}",
-                existingTrainee.getFullName(), userId);
+        logger.info("Successfully deleted trainee: {} with id: {}",
+                trainee.getFullName(), userId);
 
         return true;
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Optional<Trainee> findById(Long userId) {
         if (userId == null) {
             logger.debug("FindById called with null userId");
             return Optional.empty();
         }
 
-        logger.debug("Finding trainee by userId: {}", userId);
+        logger.debug("Finding trainee by id: {}", userId);
 
-        Trainee trainee = storage.getTrainee(userId);
+        Trainee trainee = entityManager.find(Trainee.class, userId);
 
         if (trainee != null) {
             logger.debug("Found trainee: {}", trainee.getFullName());
             return Optional.of(trainee);
         } else {
-            logger.debug("No trainee found with userId: {}", userId);
+            logger.debug("No trainee found with id: {}", userId);
             return Optional.empty();
         }
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<Trainee> findAll() {
         logger.debug("Finding all trainees");
 
-        List<Trainee> trainees = storage.getAllTrainees();
+        TypedQuery<Trainee> query = entityManager.createQuery("SELECT t FROM Trainee t", Trainee.class);
+        List<Trainee> trainees = query.getResultList();
 
         logger.debug("Found {} trainees", trainees.size());
-
         return trainees;
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Optional<Trainee> findByUsername(String username) {
         if (username == null || username.trim().isEmpty()) {
             logger.debug("FindByUsername called with invalid username: {}", username);
@@ -137,57 +127,69 @@ public class TraineeDaoImpl implements TraineeDao {
         String cleanUsername = username.trim();
         logger.debug("Finding trainee by username: {}", cleanUsername);
 
-        Optional<Trainee> result = storage.getAllTrainees().stream()
-                .filter(trainee -> cleanUsername.equals(trainee.getUsername()))
-                .findFirst();
+        try {
+            TypedQuery<Trainee> query = entityManager.createQuery(
+                    "SELECT t FROM Trainee t WHERE t.username = :username", Trainee.class);
+            query.setParameter("username", cleanUsername);
 
-        if (result.isPresent()) {
+            Trainee trainee = query.getSingleResult();
             logger.debug("Found trainee with username: {}", cleanUsername);
-        } else {
-            logger.debug("No trainee found with username: {}", cleanUsername);
-        }
+            return Optional.of(trainee);
 
-        return result;
+        } catch (NoResultException e) {
+            logger.debug("No trainee found with username: {}", cleanUsername);
+            return Optional.empty();
+        }
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<Trainee> findAllActive() {
         logger.debug("Finding all active trainees");
 
-        List<Trainee> activeTrainees = storage.getAllTrainees().stream()
-                .filter(Trainee::isActive)
-                .collect(Collectors.toList());
+        TypedQuery<Trainee> query = entityManager.createQuery(
+                "SELECT t FROM Trainee t WHERE t.isActive = true", Trainee.class);
+        List<Trainee> activeTrainees = query.getResultList();
 
-        logger.debug("Found {} active trainees out of {} total",
-                activeTrainees.size(), storage.getAllTrainees().size());
-
+        logger.debug("Found {} active trainees", activeTrainees.size());
         return activeTrainees;
     }
 
     @Override
+    @Transactional(readOnly = true)
     public boolean existsById(Long userId) {
         if (userId == null) {
             return false;
         }
 
-        boolean exists = storage.getTrainees().containsKey(userId);
-        logger.debug("Trainee exists check for userId {}: {}", userId, exists);
+        TypedQuery<Long> query = entityManager.createQuery(
+                "SELECT COUNT(t) FROM Trainee t WHERE t.id = :id", Long.class);
+        query.setParameter("id", userId);
 
+        Long count = query.getSingleResult();
+        boolean exists = count != null && count > 0;
+
+        logger.debug("Trainee exists check for id {}: {}", userId, exists);
         return exists;
     }
 
     @Override
+    @Transactional(readOnly = true)
     public boolean existsByUsername(String username) {
         if (username == null || username.trim().isEmpty()) {
             return false;
         }
 
         String cleanUsername = username.trim();
-        boolean exists = storage.getAllTrainees().stream()
-                .anyMatch(trainee -> cleanUsername.equals(trainee.getUsername()));
+
+        TypedQuery<Long> query = entityManager.createQuery(
+                "SELECT COUNT(t) FROM Trainee t WHERE t.username = :username", Long.class);
+        query.setParameter("username", cleanUsername);
+
+        Long count = query.getSingleResult();
+        boolean exists = count != null && count > 0;
 
         logger.debug("Trainee exists check for username '{}': {}", cleanUsername, exists);
-
         return exists;
     }
 }

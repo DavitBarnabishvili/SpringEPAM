@@ -1,9 +1,10 @@
 package com.gym.crm.service.impl;
 
 import com.gym.crm.dao.TrainerDao;
-import com.gym.crm.model.Trainer;
-import com.gym.crm.model.TrainingType;
+import com.gym.crm.entity.Trainer;
+import com.gym.crm.entity.TrainingType;
 import com.gym.crm.service.TrainerService;
+import com.gym.crm.util.AuthenticationService;
 import com.gym.crm.util.CredentialsGeneratorService;
 import com.gym.crm.util.ValidationService;
 import org.slf4j.Logger;
@@ -20,14 +21,16 @@ public class TrainerServiceImpl implements TrainerService {
     private static final Logger logger = LoggerFactory.getLogger(TrainerServiceImpl.class);
 
     private final TrainerDao trainerDao;
+    private final AuthenticationService authenticationService;
     private final CredentialsGeneratorService credentialsGenerator;
     private final ValidationService validationService;
 
-
     public TrainerServiceImpl(TrainerDao trainerDao,
+                              AuthenticationService authenticationService,
                               CredentialsGeneratorService credentialsGenerator,
                               ValidationService validationService) {
         this.trainerDao = trainerDao;
+        this.authenticationService = authenticationService;
         this.credentialsGenerator = credentialsGenerator;
         this.validationService = validationService;
     }
@@ -55,42 +58,99 @@ public class TrainerServiceImpl implements TrainerService {
 
         Trainer savedTrainer = trainerDao.create(trainer);
 
-        logger.info("Successfully created trainer: {} with username: {} and userId: {}",
-                savedTrainer.getFullName(), savedTrainer.getUsername(), savedTrainer.getUserId());
+        logger.info("Successfully created trainer: {} with username: {} and id: {}",
+                savedTrainer.getFullName(), savedTrainer.getUsername(), savedTrainer.getId());
 
         return savedTrainer;
     }
 
     @Override
-    public Trainer updateTrainer(Trainer trainer) {
+    public Trainer updateTrainer(String username, String password, Trainer trainer) {
         if (trainer == null) {
             throw new IllegalArgumentException("Trainer cannot be null");
         }
 
-        if (trainer.getUserId() == null) {
-            throw new IllegalArgumentException("Trainer userId is required for update");
+        if (trainer.getId() == null) {
+            throw new IllegalArgumentException("Trainer id is required for update");
         }
 
-        logger.info("Updating trainer with userId: {}", trainer.getUserId());
+        logger.info("Updating trainer with id: {}", trainer.getId());
+
+        // Authentication and authorization
+        authenticationService.authenticateTrainer(username, password);
+        authenticationService.validateTrainerAccess(username, trainer.getId());
 
         validationService.validateTrainer(trainer);
 
-        Optional<Trainer> existingTrainerOpt = trainerDao.findById(trainer.getUserId());
+        Optional<Trainer> existingTrainerOpt = trainerDao.findById(trainer.getId());
         if (existingTrainerOpt.isEmpty()) {
-            throw new RuntimeException("Trainer not found with userId: " + trainer.getUserId());
+            throw new RuntimeException("Trainer not found with id: " + trainer.getId());
         }
 
         Trainer existingTrainer = existingTrainerOpt.get();
 
+        // Preserve credentials
         trainer.setUsername(existingTrainer.getUsername());
         trainer.setPassword(existingTrainer.getPassword());
 
         Trainer updatedTrainer = trainerDao.update(trainer);
 
-        logger.info("Successfully updated trainer: {} with userId: {}",
-                updatedTrainer.getFullName(), updatedTrainer.getUserId());
+        logger.info("Successfully updated trainer: {} with id: {}",
+                updatedTrainer.getFullName(), updatedTrainer.getId());
 
         return updatedTrainer;
+    }
+
+    @Override
+    public boolean activateTrainer(String username, String password, Long userId) {
+        authenticationService.authenticateTrainer(username, password);
+        authenticationService.validateTrainerAccess(username, userId);
+
+        return updateTrainerActiveStatus(userId, true);
+    }
+
+    @Override
+    public boolean deactivateTrainer(String username, String password, Long userId) {
+        authenticationService.authenticateTrainer(username, password);
+        authenticationService.validateTrainerAccess(username, userId);
+
+        return updateTrainerActiveStatus(userId, false);
+    }
+
+    private boolean updateTrainerActiveStatus(Long userId, boolean isActive) {
+        if (userId == null) {
+            logger.debug("UpdateTrainerActiveStatus called with null userId");
+            return false;
+        }
+
+        String action = isActive ? "Activating" : "Deactivating";
+        logger.info("{} trainer with id: {}", action, userId);
+
+        Optional<Trainer> trainerOpt = trainerDao.findById(userId);
+        if (trainerOpt.isEmpty()) {
+            logger.debug("No trainer found with id: {} for status update", userId);
+            return false;
+        }
+
+        Trainer trainer = trainerOpt.get();
+        if (trainer.isActive() == isActive) {
+            String currentState = isActive ? "already active" : "already inactive";
+            logger.warn("Trainer {} is {}, operation not performed", trainer.getFullName(), currentState);
+            return false;
+        }
+
+        trainer.setIsActive(isActive);
+
+        try {
+            trainerDao.update(trainer);
+            action = isActive ? "Activated" : "Deactivated";
+            logger.info("Successfully {} trainer: {}", action.toLowerCase(), trainer.getFullName());
+            return true;
+        } catch (Exception e) {
+            action = isActive ? "Activate" : "Deactivate";
+            logger.error("Failed to {} trainer with id: {}", action.toLowerCase(), userId, e);
+            return false;
+        }
     }
 
     @Override
@@ -100,14 +160,14 @@ public class TrainerServiceImpl implements TrainerService {
             return Optional.empty();
         }
 
-        logger.debug("Finding trainer by userId: {}", userId);
+        logger.debug("Finding trainer by id: {}", userId);
 
         Optional<Trainer> result = trainerDao.findById(userId);
 
         if (result.isPresent()) {
             logger.debug("Found trainer: {}", result.get().getFullName());
         } else {
-            logger.debug("No trainer found with userId: {}", userId);
+            logger.debug("No trainer found with id: {}", userId);
         }
 
         return result;
@@ -171,7 +231,7 @@ public class TrainerServiceImpl implements TrainerService {
         }
 
         boolean exists = trainerDao.existsById(userId);
-        logger.debug("Trainer exists check for userId {}: {}", userId, exists);
+        logger.debug("Trainer exists check for id {}: {}", userId, exists);
 
         return exists;
     }

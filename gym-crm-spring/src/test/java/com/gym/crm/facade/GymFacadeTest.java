@@ -1,6 +1,6 @@
 package com.gym.crm.facade;
 
-import com.gym.crm.model.*;
+import com.gym.crm.entity.*;
 import com.gym.crm.service.TraineeService;
 import com.gym.crm.service.TrainerService;
 import com.gym.crm.service.TrainingService;

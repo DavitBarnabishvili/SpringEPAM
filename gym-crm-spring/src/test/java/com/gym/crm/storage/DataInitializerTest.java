@@ -1,6 +1,6 @@
 package com.gym.crm.storage;
 
-import com.gym.crm.model.TrainingType;
+import com.gym.crm.entity.TrainingType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

@@ -1,7 +1,7 @@
 package com.gym.crm.service;
 
-import com.gym.crm.model.Trainer;
-import com.gym.crm.model.TrainingType;
+import com.gym.crm.entity.Trainer;
+import com.gym.crm.entity.TrainingType;
 
 import java.util.List;
 import java.util.Optional;
@@ -27,7 +27,11 @@ public interface TrainerService {
      * @throws IllegalArgumentException if validation fails
      * @throws RuntimeException if trainer not found
      */
-    Trainer updateTrainer(Trainer trainer);
+    Trainer updateTrainer(String username, String password, Trainer trainer);
+
+    boolean activateTrainer(String username, String password, Long userId);
+
+    boolean deactivateTrainer(String username, String password, Long userId);
 
     /**
      * Finds a trainer by their userId.

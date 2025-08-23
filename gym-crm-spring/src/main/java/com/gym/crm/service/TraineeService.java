@@ -1,6 +1,6 @@
 package com.gym.crm.service;
 
-import com.gym.crm.model.Trainee;
+import com.gym.crm.entity.Trainee;
 
 import java.util.List;
 import java.util.Optional;
@@ -26,7 +26,7 @@ public interface TraineeService {
      * @throws IllegalArgumentException if validation fails
      * @throws RuntimeException if trainee not found
      */
-    Trainee updateTrainee(Trainee trainee);
+    Trainee updateTrainee(String username, String password, Trainee trainee);
 
     /**
      * Deletes a trainee from the system.
@@ -34,7 +34,7 @@ public interface TraineeService {
      * @param userId Trainee's userId
      * @return true if trainee was deleted, false if not found
      */
-    boolean deleteTrainee(Long userId);
+    boolean deleteTrainee(String username, String password, Long userId);
 
     /**
      * Finds a trainee by their userId.
@@ -81,7 +81,7 @@ public interface TraineeService {
      * @param userId Trainee's userId
      * @return true if trainee was activated, false if not found
      */
-    boolean activateTrainee(Long userId);
+    boolean activateTrainee(String username, String password, Long userId);
 
     /**
      * Deactivates a trainee (sets isActive to false).
@@ -89,7 +89,7 @@ public interface TraineeService {
      * @param userId Trainee's userId
      * @return true if trainee was deactivated, false if not found
      */
-    boolean deactivateTrainee(Long userId);
+    boolean deactivateTrainee(String username, String password, Long userId);
 
     /**
      * Checks if a trainee exists with the given userId.
