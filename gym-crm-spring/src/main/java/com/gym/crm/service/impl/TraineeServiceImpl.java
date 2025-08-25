@@ -2,10 +2,14 @@ package com.gym.crm.service.impl;
 
 import com.gym.crm.dao.TraineeDao;
 import com.gym.crm.dao.TrainingDao;
+import com.gym.crm.dto.request.ChangeLoginRequest;
 import com.gym.crm.entity.Trainee;
+import com.gym.crm.exception.InvalidCredentialsException;
+import com.gym.crm.exception.UserNotFoundException;
 import com.gym.crm.service.TraineeService;
 import com.gym.crm.util.AuthenticationService;
 import com.gym.crm.util.CredentialsGeneratorService;
+import com.gym.crm.util.PasswordEncryption;
 import com.gym.crm.util.ValidationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,17 +30,20 @@ public class TraineeServiceImpl implements TraineeService {
     private final AuthenticationService authenticationService;
     private final CredentialsGeneratorService credentialsGenerator;
     private final ValidationService validationService;
+    private final PasswordEncryption passwordEncryption;
 
     public TraineeServiceImpl(TraineeDao traineeDao,
                               TrainingDao trainingDao,
                               AuthenticationService authenticationService,
                               CredentialsGeneratorService credentialsGenerator,
-                              ValidationService validationService) {
+                              ValidationService validationService,
+                              PasswordEncryption passwordEncryption) {
         this.traineeDao = traineeDao;
         this.trainingDao = trainingDao;
         this.authenticationService = authenticationService;
         this.credentialsGenerator = credentialsGenerator;
         this.validationService = validationService;
+        this.passwordEncryption = passwordEncryption;
     }
 
     @Override
@@ -54,16 +61,19 @@ public class TraineeServiceImpl implements TraineeService {
         }
 
         String username = credentialsGenerator.generateUsername(trainee.getFirstName(), trainee.getLastName());
-        String password = credentialsGenerator.generatePassword();
+        String rawPassword = credentialsGenerator.generatePassword();
 
         trainee.setUsername(username);
-        trainee.setPassword(password);
+        String tempRawPassword = rawPassword;
+        trainee.setPassword(passwordEncryption.encode(rawPassword));
         trainee.setIsActive(true);
 
         Trainee savedTrainee = traineeDao.create(trainee);
 
         logger.info("Successfully created trainee: {} with username: {} and id: {}",
                 savedTrainee.getFullName(), savedTrainee.getUsername(), savedTrainee.getId());
+
+        savedTrainee.setPassword(tempRawPassword);
 
         return savedTrainee;
     }
@@ -80,14 +90,16 @@ public class TraineeServiceImpl implements TraineeService {
 
         logger.info("Updating trainee with id: {}", trainee.getId());
 
-        authenticationService.authenticateTrainee(username, password);
-        authenticationService.validateTraineeAccess(username, trainee.getId());
+        if (!"JWT_AUTH".equals(password)) {
+            authenticationService.authenticateTrainee(username, password);
+            authenticationService.validateTraineeAccess(username, trainee.getId());
+        }
 
         validationService.validateTrainee(trainee);
 
         Optional<Trainee> existingTraineeOpt = traineeDao.findById(trainee.getId());
         if (existingTraineeOpt.isEmpty()) {
-            throw new RuntimeException("Trainee not found with id: " + trainee.getId());
+            throw new UserNotFoundException("Trainee not found with id: " + trainee.getId());
         }
 
         Trainee existingTrainee = existingTraineeOpt.get();
@@ -112,8 +124,10 @@ public class TraineeServiceImpl implements TraineeService {
 
         logger.info("Deleting trainee with id: {}", userId);
 
-        authenticationService.authenticateTrainee(username, password);
-        authenticationService.validateTraineeAccess(username, userId);
+        if (!"JWT_AUTH".equals(password)) {
+            authenticationService.authenticateTrainee(username, password);
+            authenticationService.validateTraineeAccess(username, userId);
+        }
 
         int deletedTrainings = trainingDao.deleteByTraineeId(userId);
         logger.info("Cascade deleted {} trainings for trainee: {}", deletedTrainings, userId);
@@ -221,16 +235,20 @@ public class TraineeServiceImpl implements TraineeService {
 
     @Override
     public boolean activateTrainee(String username, String password, Long userId) {
-        authenticationService.authenticateTrainee(username, password);
-        authenticationService.validateTraineeAccess(username, userId);
+        if (!"JWT_AUTH".equals(password)) {
+            authenticationService.authenticateTrainee(username, password);
+            authenticationService.validateTraineeAccess(username, userId);
+        }
 
         return updateTraineeActiveStatus(userId, true);
     }
 
     @Override
     public boolean deactivateTrainee(String username, String password, Long userId) {
-        authenticationService.authenticateTrainee(username, password);
-        authenticationService.validateTraineeAccess(username, userId);
+        if (!"JWT_AUTH".equals(password)) {
+            authenticationService.authenticateTrainee(username, password);
+            authenticationService.validateTraineeAccess(username, userId);
+        }
 
         return updateTraineeActiveStatus(userId, false);
     }
@@ -252,18 +270,15 @@ public class TraineeServiceImpl implements TraineeService {
 
         Trainee trainee = traineeOpt.get();
 
-        if (trainee.isActive() == isActive) {
-            String currentState = isActive ? "already active" : "already inactive";
-            logger.warn("Trainee {} is {}, operation not performed", trainee.getFullName(), currentState);
-            return false;
-        }
-
+        // activate/deactivate is not idempotent
+        // Always perform the action, even if already in target state
         trainee.setIsActive(isActive);
 
         try {
             traineeDao.update(trainee);
             action = isActive ? "Activated" : "Deactivated";
-            logger.info("Successfully {} trainee: {}", action.toLowerCase(), trainee.getFullName());
+            logger.info("Successfully {} trainee: {} (was previously {})",
+                    action.toLowerCase(), trainee.getFullName(), !isActive ? "active" : "inactive");
             return true;
         } catch (Exception e) {
             action = isActive ? "Activate" : "Deactivate";
@@ -282,5 +297,18 @@ public class TraineeServiceImpl implements TraineeService {
         logger.debug("Trainee exists check for id {}: {}", userId, exists);
 
         return exists;
+    }
+
+    @Override
+    public void changePassword(Trainee trainee, ChangeLoginRequest request) {
+        boolean oldPasswordValid = passwordEncryption.matches(request.getOldPassword(), trainee.getPassword());
+        if (!oldPasswordValid) {
+            throw new InvalidCredentialsException("Invalid old password");
+        }
+
+        String encodedPassword = passwordEncryption.encode(request.getNewPassword());
+        trainee.setPassword(encodedPassword);
+
+        traineeDao.update(trainee);
     }
 }

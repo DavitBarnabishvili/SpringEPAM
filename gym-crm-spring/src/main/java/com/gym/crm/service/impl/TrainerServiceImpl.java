@@ -1,11 +1,14 @@
 package com.gym.crm.service.impl;
 
 import com.gym.crm.dao.TrainerDao;
+import com.gym.crm.dto.request.ChangeLoginRequest;
 import com.gym.crm.entity.Trainer;
 import com.gym.crm.entity.TrainingType;
+import com.gym.crm.exception.InvalidCredentialsException;
 import com.gym.crm.service.TrainerService;
 import com.gym.crm.util.AuthenticationService;
 import com.gym.crm.util.CredentialsGeneratorService;
+import com.gym.crm.util.PasswordEncryption;
 import com.gym.crm.util.ValidationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,15 +27,18 @@ public class TrainerServiceImpl implements TrainerService {
     private final AuthenticationService authenticationService;
     private final CredentialsGeneratorService credentialsGenerator;
     private final ValidationService validationService;
+    private final PasswordEncryption passwordEncryption;
 
     public TrainerServiceImpl(TrainerDao trainerDao,
                               AuthenticationService authenticationService,
                               CredentialsGeneratorService credentialsGenerator,
-                              ValidationService validationService) {
+                              ValidationService validationService,
+                              PasswordEncryption passwordEncryption) {
         this.trainerDao = trainerDao;
         this.authenticationService = authenticationService;
         this.credentialsGenerator = credentialsGenerator;
         this.validationService = validationService;
+        this.passwordEncryption = passwordEncryption;
     }
 
     @Override
@@ -50,16 +56,19 @@ public class TrainerServiceImpl implements TrainerService {
         }
 
         String username = credentialsGenerator.generateUsername(trainer.getFirstName(), trainer.getLastName());
-        String password = credentialsGenerator.generatePassword();
+        String rawPassword = credentialsGenerator.generatePassword();
 
         trainer.setUsername(username);
-        trainer.setPassword(password);
+        String tempRawPassword = rawPassword;
+        trainer.setPassword(passwordEncryption.encode(rawPassword));
         trainer.setIsActive(true);
 
         Trainer savedTrainer = trainerDao.create(trainer);
 
         logger.info("Successfully created trainer: {} with username: {} and id: {}",
                 savedTrainer.getFullName(), savedTrainer.getUsername(), savedTrainer.getId());
+
+        savedTrainer.setPassword(tempRawPassword);
 
         return savedTrainer;
     }
@@ -76,9 +85,10 @@ public class TrainerServiceImpl implements TrainerService {
 
         logger.info("Updating trainer with id: {}", trainer.getId());
 
-        // Authentication and authorization
-        authenticationService.authenticateTrainer(username, password);
-        authenticationService.validateTrainerAccess(username, trainer.getId());
+        if (!"JWT_AUTH".equals(password)) {
+            authenticationService.authenticateTrainer(username, password);
+            authenticationService.validateTrainerAccess(username, trainer.getId());
+        }
 
         validationService.validateTrainer(trainer);
 
@@ -89,9 +99,9 @@ public class TrainerServiceImpl implements TrainerService {
 
         Trainer existingTrainer = existingTrainerOpt.get();
 
-        // Preserve credentials
         trainer.setUsername(existingTrainer.getUsername());
         trainer.setPassword(existingTrainer.getPassword());
+        trainer.setSpecialization(existingTrainer.getSpecialization());
 
         Trainer updatedTrainer = trainerDao.update(trainer);
 
@@ -103,16 +113,20 @@ public class TrainerServiceImpl implements TrainerService {
 
     @Override
     public boolean activateTrainer(String username, String password, Long userId) {
-        authenticationService.authenticateTrainer(username, password);
-        authenticationService.validateTrainerAccess(username, userId);
+        if (!"JWT_AUTH".equals(password)) {
+            authenticationService.authenticateTrainer(username, password);
+            authenticationService.validateTrainerAccess(username, userId);
+        }
 
         return updateTrainerActiveStatus(userId, true);
     }
 
     @Override
     public boolean deactivateTrainer(String username, String password, Long userId) {
-        authenticationService.authenticateTrainer(username, password);
-        authenticationService.validateTrainerAccess(username, userId);
+        if (!"JWT_AUTH".equals(password)) {
+            authenticationService.authenticateTrainer(username, password);
+            authenticationService.validateTrainerAccess(username, userId);
+        }
 
         return updateTrainerActiveStatus(userId, false);
     }
@@ -133,18 +147,16 @@ public class TrainerServiceImpl implements TrainerService {
         }
 
         Trainer trainer = trainerOpt.get();
-        if (trainer.isActive() == isActive) {
-            String currentState = isActive ? "already active" : "already inactive";
-            logger.warn("Trainer {} is {}, operation not performed", trainer.getFullName(), currentState);
-            return false;
-        }
 
+        // activate/deactivate is not idempotent
+        // Always perform the action, even if already in target state
         trainer.setIsActive(isActive);
 
         try {
             trainerDao.update(trainer);
             action = isActive ? "Activated" : "Deactivated";
-            logger.info("Successfully {} trainer: {}", action.toLowerCase(), trainer.getFullName());
+            logger.info("Successfully {} trainer: {} (was previously {})",
+                    action.toLowerCase(), trainer.getFullName(), !isActive ? "active" : "inactive");
             return true;
         } catch (Exception e) {
             action = isActive ? "Activate" : "Deactivate";
@@ -234,5 +246,18 @@ public class TrainerServiceImpl implements TrainerService {
         logger.debug("Trainer exists check for id {}: {}", userId, exists);
 
         return exists;
+    }
+
+    @Override
+    public void changePassword(Trainer trainer, ChangeLoginRequest request) {
+        boolean oldPasswordValid = passwordEncryption.matches(request.getOldPassword(), trainer.getPassword());
+        if (!oldPasswordValid) {
+            throw new InvalidCredentialsException("Invalid old password");
+        }
+
+        String encodedPassword = passwordEncryption.encode(request.getNewPassword());
+        trainer.setPassword(encodedPassword);
+
+        trainerDao.update(trainer);
     }
 }

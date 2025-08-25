@@ -4,8 +4,8 @@ import com.gym.crm.dao.TraineeDao;
 import com.gym.crm.dao.TrainerDao;
 import com.gym.crm.dao.TrainingDao;
 import com.gym.crm.entity.Training;
+import com.gym.crm.exception.UnauthorizedAccessException;
 import com.gym.crm.service.TrainingService;
-import com.gym.crm.util.AuthenticationService;
 import com.gym.crm.util.ValidationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,42 +23,29 @@ public class TrainingServiceImpl implements TrainingService {
     private final TrainingDao trainingDao;
     private final TrainerDao trainerDao;
     private final TraineeDao traineeDao;
-    private final AuthenticationService authenticationService;
     private final ValidationService validationService;
 
     public TrainingServiceImpl(TrainingDao trainingDao,
                                TrainerDao trainerDao,
                                TraineeDao traineeDao,
-                               AuthenticationService authenticationService,
                                ValidationService validationService) {
         this.trainingDao = trainingDao;
         this.trainerDao = trainerDao;
         this.traineeDao = traineeDao;
-        this.authenticationService = authenticationService;
         this.validationService = validationService;
     }
 
     @Override
-    public Training createTraining(String username, String password, Training training) {
+    public Training createTraining(String authenticatedUsername, Training training) {
         if (training == null) {
             throw new IllegalArgumentException("Training cannot be null");
         }
 
-        logger.info("Creating training: '{}' for trainee {} and trainer {}",
-                training.getTrainingName(), training.getTraineeId(), training.getTrainerId());
+        logger.info("Creating training: '{}' for trainee {} and trainer {} by user: {}",
+                training.getTrainingName(), training.getTraineeId(), training.getTrainerId(), authenticatedUsername);
 
-        boolean isTraineeAuth = authenticationService.isValidTraineeCredentials(username, password);
-        boolean isTrainerAuth = authenticationService.isValidTrainerCredentials(username, password);
-
-        if (!isTraineeAuth && !isTrainerAuth) {
-            throw new SecurityException("Authentication failed");
-        }
-
-        if (isTraineeAuth) {
-            authenticationService.validateTraineeAccess(username, training.getTraineeId());
-        } else {
-            authenticationService.validateTrainerAccess(username, training.getTrainerId());
-        }
+        // user can create training if they're either the trainee or the trainer
+        validateTrainingAccess(authenticatedUsername, training.getTraineeId(), training.getTrainerId());
 
         validationService.validateTraining(training);
 
@@ -121,16 +108,16 @@ public class TrainingServiceImpl implements TrainingService {
     }
 
     @Override
-    public List<Training> findTrainingsByTraineeId(String username, String password, Long traineeId) {
+    public List<Training> findTrainingsByTraineeId(String authenticatedUsername, Long traineeId) {
         if (traineeId == null) {
             logger.debug("FindTrainingsByTraineeId called with null traineeId");
             return List.of();
         }
 
-        logger.debug("Finding trainings for trainee: {}", traineeId);
+        logger.debug("Finding trainings for trainee: {} by user: {}", traineeId, authenticatedUsername);
 
-        authenticationService.authenticateTrainee(username, password);
-        authenticationService.validateTraineeAccess(username, traineeId);
+        // user can only view their own trainings
+        validateTraineeAccess(authenticatedUsername, traineeId);
 
         List<Training> trainings = trainingDao.findByTraineeId(traineeId);
 
@@ -140,16 +127,16 @@ public class TrainingServiceImpl implements TrainingService {
     }
 
     @Override
-    public List<Training> findTrainingsByTrainerId(String username, String password, Long trainerId) {
+    public List<Training> findTrainingsByTrainerId(String authenticatedUsername, Long trainerId) {
         if (trainerId == null) {
             logger.debug("FindTrainingsByTrainerId called with null trainerId");
             return List.of();
         }
 
-        logger.debug("Finding trainings for trainer: {}", trainerId);
+        logger.debug("Finding trainings for trainer: {} by user: {}", trainerId, authenticatedUsername);
 
-        authenticationService.authenticateTrainer(username, password);
-        authenticationService.validateTrainerAccess(username, trainerId);
+        // user can only view their own trainings
+        validateTrainerAccess(authenticatedUsername, trainerId);
 
         List<Training> trainings = trainingDao.findByTrainerId(trainerId);
 
@@ -196,7 +183,7 @@ public class TrainingServiceImpl implements TrainingService {
     }
 
     @Override
-    public List<Training> findTraineeTrainingsByDateRange(String username, String password, Long traineeId, LocalDate startDate, LocalDate endDate) {
+    public List<Training> findTraineeTrainingsByDateRange(String authenticatedUsername, Long traineeId, LocalDate startDate, LocalDate endDate) {
         if (traineeId == null || startDate == null || endDate == null) {
             logger.debug("FindTraineeTrainingsByDateRange called with null parameters: traineeId={}, start={}, end={}",
                     traineeId, startDate, endDate);
@@ -208,10 +195,10 @@ public class TrainingServiceImpl implements TrainingService {
             return List.of();
         }
 
-        logger.debug("Finding trainings for trainee {} between {} and {}", traineeId, startDate, endDate);
+        logger.debug("Finding trainings for trainee {} between {} and {} by user: {}", traineeId, startDate, endDate, authenticatedUsername);
 
-        authenticationService.authenticateTrainee(username, password);
-        authenticationService.validateTraineeAccess(username, traineeId);
+        // user can only view their own trainings
+        validateTraineeAccess(authenticatedUsername, traineeId);
 
         List<Training> trainings = trainingDao.findByTraineeIdAndDateRange(traineeId, startDate, endDate);
 
@@ -222,7 +209,7 @@ public class TrainingServiceImpl implements TrainingService {
     }
 
     @Override
-    public List<Training> findTrainerTrainingsByDateRange(String username, String password, Long trainerId, LocalDate startDate, LocalDate endDate) {
+    public List<Training> findTrainerTrainingsByDateRange(String authenticatedUsername, Long trainerId, LocalDate startDate, LocalDate endDate) {
         if (trainerId == null || startDate == null || endDate == null) {
             logger.debug("FindTrainerTrainingsByDateRange called with null parameters: trainerId={}, start={}, end={}",
                     trainerId, startDate, endDate);
@@ -234,10 +221,10 @@ public class TrainingServiceImpl implements TrainingService {
             return List.of();
         }
 
-        logger.debug("Finding trainings for trainer {} between {} and {}", trainerId, startDate, endDate);
+        logger.debug("Finding trainings for trainer {} between {} and {} by user: {}", trainerId, startDate, endDate, authenticatedUsername);
 
-        authenticationService.authenticateTrainer(username, password);
-        authenticationService.validateTrainerAccess(username, trainerId);
+        // user can only view their own trainings
+        validateTrainerAccess(authenticatedUsername, trainerId);
 
         List<Training> trainings = trainingDao.findByTrainerIdAndDateRange(trainerId, startDate, endDate);
 
@@ -257,5 +244,60 @@ public class TrainingServiceImpl implements TrainingService {
         logger.debug("Training exists check for id {}: {}", id, exists);
 
         return exists;
+    }
+
+    private void validateTraineeAccess(String authenticatedUsername, Long targetTraineeId) {
+        if (authenticatedUsername == null || targetTraineeId == null) {
+            throw new UnauthorizedAccessException("Invalid access validation parameters");
+        }
+
+        Optional<com.gym.crm.entity.Trainee> targetTraineeOpt = traineeDao.findById(targetTraineeId);
+        if (targetTraineeOpt.isEmpty()) {
+            throw new UnauthorizedAccessException("Target trainee not found");
+        }
+
+        com.gym.crm.entity.Trainee targetTrainee = targetTraineeOpt.get();
+
+        if (!authenticatedUsername.equals(targetTrainee.getUsername())) {
+            logger.warn("Access denied: {} attempted to access trainee data for: {}",
+                    authenticatedUsername, targetTrainee.getUsername());
+            throw new UnauthorizedAccessException("Users can only access their own data");
+        }
+
+        logger.debug("Access validated: {} can access trainee data", authenticatedUsername);
+    }
+
+    private void validateTrainerAccess(String authenticatedUsername, Long targetTrainerId) {
+        if (authenticatedUsername == null || targetTrainerId == null) {
+            throw new UnauthorizedAccessException("Invalid access validation parameters");
+        }
+
+        Optional<com.gym.crm.entity.Trainer> targetTrainerOpt = trainerDao.findById(targetTrainerId);
+        if (targetTrainerOpt.isEmpty()) {
+            throw new UnauthorizedAccessException("Target trainer not found");
+        }
+
+        com.gym.crm.entity.Trainer targetTrainer = targetTrainerOpt.get();
+
+        if (!authenticatedUsername.equals(targetTrainer.getUsername())) {
+            logger.warn("Access denied: {} attempted to access trainer data for: {}",
+                    authenticatedUsername, targetTrainer.getUsername());
+            throw new UnauthorizedAccessException("Users can only access their own data");
+        }
+
+        logger.debug("Access validated: {} can access trainer data", authenticatedUsername);
+    }
+
+    private void validateTrainingAccess(String authenticatedUsername, Long traineeId, Long trainerId) {
+        // User can create training if they are either the trainee or the trainer
+        try {
+            validateTraineeAccess(authenticatedUsername, traineeId);
+        } catch (UnauthorizedAccessException e) {
+            try {
+                validateTrainerAccess(authenticatedUsername, trainerId);
+            } catch (UnauthorizedAccessException e2) {
+                throw new UnauthorizedAccessException("User can only create trainings for themselves");
+            }
+        }
     }
 }
