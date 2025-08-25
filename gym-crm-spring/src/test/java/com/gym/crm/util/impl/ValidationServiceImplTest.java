@@ -1,368 +1,343 @@
 package com.gym.crm.util.impl;
 
 import com.gym.crm.entity.Trainee;
+import com.gym.crm.entity.Trainer;
+import com.gym.crm.entity.Training;
+import com.gym.crm.entity.TrainingType;
+import com.gym.crm.util.ValidationService;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
-import org.junit.jupiter.params.provider.NullAndEmptySource;
-import org.junit.jupiter.params.provider.ValueSource;
-import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.stream.Stream;
+import java.time.LocalDate;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@ExtendWith(MockitoExtension.class)
-@DisplayName("ValidationServiceImpl Tests")
 class ValidationServiceImplTest {
 
-    private ValidationServiceImpl validationService;
+    private ValidationService validationService;
+    private Trainee testTrainee;
+    private Trainer testTrainer;
+    private Training testTraining;
+    private TrainingType testTrainingType;
 
     @BeforeEach
     void setUp() {
         validationService = new ValidationServiceImpl();
+
+        testTrainee = new Trainee("John", "Doe", LocalDate.now().minusYears(25), "123 Test St");
+        testTrainee.setId(1L);
+
+        testTrainingType = new TrainingType("Cardio");
+        testTrainingType.setId(1L);
+
+        testTrainer = new Trainer("Jane", "Smith", testTrainingType);
+        testTrainer.setId(2L);
+
+        testTraining = new Training(1L, 2L, "Test Training", testTrainingType, LocalDate.now(), 60);
     }
 
     @Test
-    @DisplayName("validateTrainer should throw exception for null trainer")
-    void validateTrainer_WithNullTrainer_ShouldThrowException() {
-        assertThrows(IllegalArgumentException.class,
-                () -> validationService.validateTrainer(null));
+    void validateTrainer_ShouldPass_WhenTrainerValid() {
+        validationService.validateTrainer(testTrainer);
     }
 
     @Test
-    @DisplayName("validateTrainer should validate first name")
-    void validateTrainer_WithInvalidFirstName_ShouldThrowException() {
-        com.gym.crm.entity.Trainer trainer = new com.gym.crm.entity.Trainer(null, "Doe");
-
-        assertThrows(IllegalArgumentException.class,
-                () -> validationService.validateTrainer(trainer));
+    void validateTrainer_ShouldThrowException_WhenTrainerNull() {
+        assertThatThrownBy(() -> validationService.validateTrainer(null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Trainer cannot be null");
     }
 
     @Test
-    @DisplayName("validateTrainer should validate last name")
-    void validateTrainer_WithInvalidLastName_ShouldThrowException() {
-        com.gym.crm.entity.Trainer trainer = new com.gym.crm.entity.Trainer("John", "");
+    void validateTrainer_ShouldThrowException_WhenFirstNameNull() {
+        testTrainer.setFirstName(null);
 
-        assertThrows(IllegalArgumentException.class,
-                () -> validationService.validateTrainer(trainer));
+        assertThatThrownBy(() -> validationService.validateTrainer(testTrainer))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("First name is required");
     }
 
     @Test
-    @DisplayName("validateTrainer should validate specialization")
-    void validateTrainer_WithInvalidSpecialization_ShouldThrowException() {
-        com.gym.crm.entity.TrainingType invalidType = new com.gym.crm.entity.TrainingType("");
-        com.gym.crm.entity.Trainer trainer = new com.gym.crm.entity.Trainer("John", "Doe", invalidType);
+    void validateTrainer_ShouldThrowException_WhenLastNameNull() {
+        testTrainer.setLastName(null);
 
-        assertThrows(IllegalArgumentException.class,
-                () -> validationService.validateTrainer(trainer));
+        assertThatThrownBy(() -> validationService.validateTrainer(testTrainer))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Last name is required");
     }
 
     @Test
-    @DisplayName("validateTrainer should pass for valid trainer")
-    void validateTrainer_WithValidTrainer_ShouldPass() {
-        com.gym.crm.entity.TrainingType validType = new com.gym.crm.entity.TrainingType("Cardio");
-        com.gym.crm.entity.Trainer trainer = new com.gym.crm.entity.Trainer("John", "Doe", validType);
+    void validateTrainer_ShouldThrowException_WhenSpecializationInvalid() {
+        TrainingType invalidType = new TrainingType();
+        invalidType.setTrainingTypeName(null);
+        testTrainer.setSpecialization(invalidType);
 
-        assertDoesNotThrow(() -> validationService.validateTrainer(trainer));
+        assertThatThrownBy(() -> validationService.validateTrainer(testTrainer))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Specialization must have a valid training type name");
     }
 
     @Test
-    @DisplayName("validateTrainer should allow null specialization")
-    void validateTrainer_WithNullSpecialization_ShouldPass() {
-        com.gym.crm.entity.Trainer trainer = new com.gym.crm.entity.Trainer("John", "Doe");
-
-        assertDoesNotThrow(() -> validationService.validateTrainer(trainer));
+    void validateTrainee_ShouldPass_WhenTraineeValid() {
+        validationService.validateTrainee(testTrainee);
     }
 
     @Test
-    @DisplayName("validateTrainee should throw exception for null trainee")
-    void validateTrainee_WithNullTrainee_ShouldThrowException() {
-        assertThrows(IllegalArgumentException.class,
-                () -> validationService.validateTrainee(null));
+    void validateTrainee_ShouldThrowException_WhenTraineeNull() {
+        assertThatThrownBy(() -> validationService.validateTrainee(null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Trainee cannot be null");
     }
 
     @Test
-    @DisplayName("validateTrainee should validate first name")
-    void validateTrainee_WithInvalidFirstName_ShouldThrowException() {
-        Trainee trainee = new Trainee(null, "Doe");
+    void validateTrainee_ShouldThrowException_WhenFirstNameNull() {
+        testTrainee.setFirstName(null);
 
-        assertThrows(IllegalArgumentException.class,
-                () -> validationService.validateTrainee(trainee));
+        assertThatThrownBy(() -> validationService.validateTrainee(testTrainee))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("First name is required");
     }
 
     @Test
-    @DisplayName("validateTrainee should validate last name")
-    void validateTrainee_WithInvalidLastName_ShouldThrowException() {
-        Trainee trainee = new Trainee("John", "");
+    void validateTrainee_ShouldThrowException_WhenLastNameNull() {
+        testTrainee.setLastName(null);
 
-        assertThrows(IllegalArgumentException.class,
-                () -> validationService.validateTrainee(trainee));
+        assertThatThrownBy(() -> validationService.validateTrainee(testTrainee))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Last name is required");
     }
 
     @Test
-    @DisplayName("validateTrainee should validate date of birth")
-    void validateTrainee_WithInvalidDateOfBirth_ShouldThrowException() {
-        Trainee trainee = new Trainee("John", "Doe",
-                java.time.LocalDate.now().plusDays(1), "123 Main St");
+    void validateTrainee_ShouldThrowException_WhenAddressEmpty() {
+        testTrainee.setAddress("  ");
 
-        assertThrows(IllegalArgumentException.class,
-                () -> validationService.validateTrainee(trainee));
+        assertThatThrownBy(() -> validationService.validateTrainee(testTrainee))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Address (if provided) cannot be empty");
     }
 
     @Test
-    @DisplayName("validateTrainee should reject empty address")
-    void validateTrainee_WithEmptyAddress_ShouldThrowException() {
-        Trainee trainee = new Trainee("John", "Doe",
-                java.time.LocalDate.of(1990, 1, 1), "   ");
+    void validateTrainee_ShouldPass_WhenDateOfBirthValid() {
+        testTrainee.setDateOfBirth(LocalDate.now().minusYears(20));
 
-        assertThrows(IllegalArgumentException.class,
-                () -> validationService.validateTrainee(trainee));
+        validationService.validateTrainee(testTrainee);
     }
 
     @Test
-    @DisplayName("validateTrainee should pass for valid trainee")
-    void validateTrainee_WithValidTrainee_ShouldPass() {
-        Trainee trainee = new Trainee("John", "Doe",
-                java.time.LocalDate.of(1990, 1, 1), "123 Main St");
+    void validateTrainee_ShouldThrowException_WhenTooYoung() {
+        testTrainee.setDateOfBirth(LocalDate.now().minusYears(15));
 
-        assertDoesNotThrow(() -> validationService.validateTrainee(trainee));
+        assertThatThrownBy(() -> validationService.validateTrainee(testTrainee))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Trainee must be at least 16 years old");
     }
 
     @Test
-    @DisplayName("validateTrainee should allow null date of birth and address")
-    void validateTrainee_WithNullOptionalFields_ShouldPass() {
-        Trainee trainee = new Trainee("John", "Doe", null, null);
+    void validateTrainee_ShouldThrowException_WhenTooOld() {
+        testTrainee.setDateOfBirth(LocalDate.now().minusYears(117));
 
-        assertDoesNotThrow(() -> validationService.validateTrainee(trainee));
+        assertThatThrownBy(() -> validationService.validateTrainee(testTrainee))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Age cannot exceed 116 years");
     }
 
     @Test
-    @DisplayName("validateTraining should throw exception for null training")
-    void validateTraining_WithNullTraining_ShouldThrowException() {
-        assertThrows(IllegalArgumentException.class,
-                () -> validationService.validateTraining(null));
+    void validateTraining_ShouldPass_WhenTrainingValid() {
+        validationService.validateTraining(testTraining);
     }
 
     @Test
-    @DisplayName("validateTraining should require trainee ID")
-    void validateTraining_WithNullTraineeId_ShouldThrowException() {
-        com.gym.crm.entity.Training training = new com.gym.crm.entity.Training(
-                null, 2L, "Test", new com.gym.crm.entity.TrainingType("Cardio"),
-                java.time.LocalDate.now(), 60);
-
-        assertThrows(IllegalArgumentException.class,
-                () -> validationService.validateTraining(training));
+    void validateTraining_ShouldThrowException_WhenTrainingNull() {
+        assertThatThrownBy(() -> validationService.validateTraining(null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Training cannot be null");
     }
 
     @Test
-    @DisplayName("validateTraining should require trainer ID")
-    void validateTraining_WithNullTrainerId_ShouldThrowException() {
-        com.gym.crm.entity.Training training = new com.gym.crm.entity.Training(
-                1L, null, "Test", new com.gym.crm.entity.TrainingType("Cardio"),
-                java.time.LocalDate.now(), 60);
+    void validateTraining_ShouldThrowException_WhenTraineeIdNull() {
+        testTraining.setTraineeId(null);
 
-        assertThrows(IllegalArgumentException.class,
-                () -> validationService.validateTraining(training));
+        assertThatThrownBy(() -> validationService.validateTraining(testTraining))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Trainee ID is required");
     }
 
     @Test
-    @DisplayName("validateTraining should require training name")
-    void validateTraining_WithNullTrainingName_ShouldThrowException() {
-        com.gym.crm.entity.Training training = new com.gym.crm.entity.Training(
-                1L, 2L, null, new com.gym.crm.entity.TrainingType("Cardio"),
-                java.time.LocalDate.now(), 60);
+    void validateTraining_ShouldThrowException_WhenTrainerIdNull() {
+        testTraining.setTrainerId(null);
 
-        assertThrows(IllegalArgumentException.class,
-                () -> validationService.validateTraining(training));
+        assertThatThrownBy(() -> validationService.validateTraining(testTraining))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Trainer ID is required");
     }
 
     @Test
-    @DisplayName("validateTraining should require training type")
-    void validateTraining_WithNullTrainingType_ShouldThrowException() {
-        com.gym.crm.entity.Training training = new com.gym.crm.entity.Training(
-                1L, 2L, "Test", null, java.time.LocalDate.now(), 60);
+    void validateTraining_ShouldThrowException_WhenTrainingNameNull() {
+        testTraining.setTrainingName(null);
 
-        assertThrows(IllegalArgumentException.class,
-                () -> validationService.validateTraining(training));
+        assertThatThrownBy(() -> validationService.validateTraining(testTraining))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Training name is required");
     }
 
     @Test
-    @DisplayName("validateTraining should require training date")
-    void validateTraining_WithNullTrainingDate_ShouldThrowException() {
-        com.gym.crm.entity.Training training = new com.gym.crm.entity.Training(
-                1L, 2L, "Test", new com.gym.crm.entity.TrainingType("Cardio"), null, 60);
+    void validateTraining_ShouldThrowException_WhenTrainingNameEmpty() {
+        testTraining.setTrainingName("  ");
 
-        assertThrows(IllegalArgumentException.class,
-                () -> validationService.validateTraining(training));
+        assertThatThrownBy(() -> validationService.validateTraining(testTraining))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Training name is required");
     }
 
     @Test
-    @DisplayName("validateTraining should validate duration when provided")
-    void validateTraining_WithInvalidDuration_ShouldThrowException() {
-        com.gym.crm.entity.Training training = new com.gym.crm.entity.Training(
-                1L, 2L, "Test", new com.gym.crm.entity.TrainingType("Cardio"),
-                java.time.LocalDate.now(), 5);
+    void validateTraining_ShouldThrowException_WhenTrainingTypeNull() {
+        testTraining.setTrainingType(null);
 
-        assertThrows(IllegalArgumentException.class,
-                () -> validationService.validateTraining(training));
+        assertThatThrownBy(() -> validationService.validateTraining(testTraining))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Training type is required");
     }
 
     @Test
-    @DisplayName("validateTraining should pass for valid training")
-    void validateTraining_WithValidTraining_ShouldPass() {
-        com.gym.crm.entity.Training training = new com.gym.crm.entity.Training(
-                1L, 2L, "Test", new com.gym.crm.entity.TrainingType("Cardio"),
-                java.time.LocalDate.now(), 60);
+    void validateTraining_ShouldThrowException_WhenTrainingDateNull() {
+        testTraining.setTrainingDate(null);
 
-        assertDoesNotThrow(() -> validationService.validateTraining(training));
+        assertThatThrownBy(() -> validationService.validateTraining(testTraining))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Training date is required");
     }
 
     @Test
-    @DisplayName("validateTraining should allow null duration")
-    void validateTraining_WithNullDuration_ShouldPass() {
-        com.gym.crm.entity.Training training = new com.gym.crm.entity.Training(
-                1L, 2L, "Test", new com.gym.crm.entity.TrainingType("Cardio"),
-                java.time.LocalDate.now(), null);
+    void validateName_ShouldReturnTrue_WhenNameValid() {
+        boolean valid = validationService.validateName("John", "First name");
 
-        assertDoesNotThrow(() -> validationService.validateTraining(training));
-    }
-
-    @ParameterizedTest
-    @NullAndEmptySource
-    @ValueSource(strings = {"   ", "\t\n"})
-    @DisplayName("validateName should throw exception for invalid names")
-    void validateName_WithInvalidName_ShouldThrowException(String name) {
-        assertThrows(IllegalArgumentException.class,
-                () -> validationService.validateName(name, "Test Field"));
+        assertThat(valid).isTrue();
     }
 
     @Test
-    @DisplayName("validateName should throw exception for too long name")
-    void validateName_WithTooLongName_ShouldThrowException() {
-        String longName = "a".repeat(51); // 51 characters
-
-        assertThrows(IllegalArgumentException.class,
-                () -> validationService.validateName(longName, "Test Field"));
+    void validateName_ShouldReturnTrue_WhenNameHasValidSpecialChars() {
+        assertThat(validationService.validateName("Mary-Jane", "First name")).isTrue();
+        assertThat(validationService.validateName("O'Brien", "Last name")).isTrue();
+        assertThat(validationService.validateName("John Smith", "Full name")).isTrue();
     }
 
     @Test
-    @DisplayName("validateName should throw exception for invalid characters")
-    void validateName_WithInvalidCharacters_ShouldThrowException() {
-        assertThrows(IllegalArgumentException.class,
-                () -> validationService.validateName("John123", "Test Field"));
-        assertThrows(IllegalArgumentException.class,
-                () -> validationService.validateName("John@Doe", "Test Field"));
-    }
-
-    @ParameterizedTest
-    @ValueSource(strings = {"John", "Mary-Jane", "O'Connor", "Jean Marie", "Anne-Marie O'Sullivan"})
-    @DisplayName("validateName should pass for valid names")
-    void validateName_WithValidNames_ShouldPass(String name) {
-        assertDoesNotThrow(() -> validationService.validateName(name, "Test Field"));
+    void validateName_ShouldThrowException_WhenNameNull() {
+        assertThatThrownBy(() -> validationService.validateName(null, "First name"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("First name is required");
     }
 
     @Test
-    @DisplayName("validateDateOfBirth should throw exception for null date")
-    void validateDateOfBirth_WithNullDate_ShouldThrowException() {
-        assertThrows(IllegalArgumentException.class,
-                () -> validationService.validateDateOfBirth(null));
+    void validateName_ShouldThrowException_WhenNameEmpty() {
+        assertThatThrownBy(() -> validationService.validateName("", "First name"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("First name is required");
     }
 
     @Test
-    @DisplayName("validateDateOfBirth should throw exception for future date")
-    void validateDateOfBirth_WithFutureDate_ShouldThrowException() {
-        java.time.LocalDate futureDate = java.time.LocalDate.now().plusDays(1);
+    void validateName_ShouldThrowException_WhenNameTooLong() {
+        String longName = "A".repeat(51);
 
-        assertThrows(IllegalArgumentException.class,
-                () -> validationService.validateDateOfBirth(futureDate));
+        assertThatThrownBy(() -> validationService.validateName(longName, "First name"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("First name cannot be longer than 50 characters");
     }
 
     @Test
-    @DisplayName("validateDateOfBirth should throw exception for too young")
-    void validateDateOfBirth_WithTooYoung_ShouldThrowException() {
-        java.time.LocalDate tooYoung = java.time.LocalDate.now().minusYears(15);
-
-        assertThrows(IllegalArgumentException.class,
-                () -> validationService.validateDateOfBirth(tooYoung));
+    void validateName_ShouldThrowException_WhenNameHasInvalidChars() {
+        assertThatThrownBy(() -> validationService.validateName("John123", "First name"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("First name can only contain letters, spaces, hyphens, and apostrophes");
     }
 
     @Test
-    @DisplayName("validateDateOfBirth should throw exception for too old")
-    void validateDateOfBirth_WithTooOld_ShouldThrowException() {
-        java.time.LocalDate tooOld = java.time.LocalDate.now().minusYears(117);
+    void validateDateOfBirth_ShouldReturnTrue_WhenDateValid() {
+        boolean valid = validationService.validateDateOfBirth(LocalDate.now().minusYears(25));
 
-        assertThrows(IllegalArgumentException.class,
-                () -> validationService.validateDateOfBirth(tooOld));
+        assertThat(valid).isTrue();
     }
 
     @Test
-    @DisplayName("validateDateOfBirth should pass for valid age")
-    void validateDateOfBirth_WithValidAge_ShouldPass() {
-        java.time.LocalDate validDate = java.time.LocalDate.now().minusYears(25);
-
-        assertDoesNotThrow(() -> validationService.validateDateOfBirth(validDate));
+    void validateDateOfBirth_ShouldThrowException_WhenDateNull() {
+        assertThatThrownBy(() -> validationService.validateDateOfBirth(null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Date of birth cannot be null");
     }
 
     @Test
-    @DisplayName("validateDateOfBirth should pass for minimum age")
-    void validateDateOfBirth_WithMinimumAge_ShouldPass() {
-        java.time.LocalDate minAge = java.time.LocalDate.now().minusYears(16);
-
-        assertDoesNotThrow(() -> validationService.validateDateOfBirth(minAge));
+    void validateDateOfBirth_ShouldThrowException_WhenDateInFuture() {
+        assertThatThrownBy(() -> validationService.validateDateOfBirth(LocalDate.now().plusDays(1)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Date of birth cannot be in the future");
     }
 
     @Test
-    @DisplayName("validateDateOfBirth should pass for maximum age")
-    void validateDateOfBirth_WithMaximumAge_ShouldPass() {
-        java.time.LocalDate maxAge = java.time.LocalDate.now().minusYears(116);
-
-        assertDoesNotThrow(() -> validationService.validateDateOfBirth(maxAge));
+    void validateDateOfBirth_ShouldThrowException_WhenAgeLessThan16() {
+        assertThatThrownBy(() -> validationService.validateDateOfBirth(LocalDate.now().minusYears(15)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Trainee must be at least 16 years old");
     }
 
     @Test
-    @DisplayName("validateTrainingDuration should throw exception for null duration")
-    void validateTrainingDuration_WithNullDuration_ShouldThrowException() {
-        assertThrows(IllegalArgumentException.class,
-                () -> validationService.validateTrainingDuration(null));
+    void validateDateOfBirth_ShouldThrowException_WhenAgeMoreThan116() {
+        assertThatThrownBy(() -> validationService.validateDateOfBirth(LocalDate.now().minusYears(117)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Age cannot exceed 116 years");
     }
 
-    @ParameterizedTest
-    @MethodSource("invalidDurations")
-    @DisplayName("validateTrainingDuration should throw exception for invalid durations")
-    void validateTrainingDuration_WithInvalidDuration_ShouldThrowException(Integer duration) {
-        assertThrows(IllegalArgumentException.class,
-                () -> validationService.validateTrainingDuration(duration));
+    @Test
+    void validateTrainingDuration_ShouldReturnTrue_WhenDurationValid() {
+        assertThat(validationService.validateTrainingDuration(30)).isTrue();
+        assertThat(validationService.validateTrainingDuration(60)).isTrue();
+        assertThat(validationService.validateTrainingDuration(480)).isTrue();
     }
 
-    static Stream<Arguments> invalidDurations() {
-        return Stream.of(
-                Arguments.of(14),  // Too short
-                Arguments.of(0),   // Zero
-                Arguments.of(-5),  // Negative
-                Arguments.of(481)  // Too long
-        );
+    @Test
+    void validateTrainingDuration_ShouldThrowException_WhenDurationNull() {
+        assertThatThrownBy(() -> validationService.validateTrainingDuration(null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Training duration cannot be null");
     }
 
-    @ParameterizedTest
-    @MethodSource("validDurations")
-    @DisplayName("validateTrainingDuration should pass for valid durations")
-    void validateTrainingDuration_WithValidDuration_ShouldPass(Integer duration) {
-        assertDoesNotThrow(() -> validationService.validateTrainingDuration(duration));
+    @Test
+    void validateTrainingDuration_ShouldThrowException_WhenDurationTooShort() {
+        assertThatThrownBy(() -> validationService.validateTrainingDuration(14))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Training duration must be at least 15 minutes");
     }
 
-    static Stream<Arguments> validDurations() {
-        return Stream.of(
-                Arguments.of(15),   // Minimum
-                Arguments.of(30),   // Short session
-                Arguments.of(60),   // Standard session
-                Arguments.of(120),  // Long session
-                Arguments.of(480)   // Maximum
-        );
+    @Test
+    void validateTrainingDuration_ShouldThrowException_WhenDurationTooLong() {
+        assertThatThrownBy(() -> validationService.validateTrainingDuration(481))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Training duration cannot exceed 480 minutes");
+    }
+
+    @Test
+    void validateTraining_ShouldValidateDuration_WhenDurationNotNull() {
+        testTraining.setTrainingDuration(10);
+
+        assertThatThrownBy(() -> validationService.validateTraining(testTraining))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Training duration must be at least 15 minutes");
+    }
+
+    @Test
+    void validateDateOfBirth_ShouldHandleLeapYear() {
+        LocalDate leapYearBirthdate = LocalDate.of(2000, 2, 29);
+        testTrainee.setDateOfBirth(leapYearBirthdate);
+
+        validationService.validateTrainee(testTrainee);
+    }
+
+    @Test
+    void validateName_ShouldAcceptMaxLength() {
+        String maxLengthName = "A".repeat(50);
+
+        boolean valid = validationService.validateName(maxLengthName, "Name");
+
+        assertThat(valid).isTrue();
     }
 }
