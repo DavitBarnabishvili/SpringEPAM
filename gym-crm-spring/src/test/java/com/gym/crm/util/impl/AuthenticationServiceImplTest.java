@@ -9,7 +9,6 @@ import com.gym.crm.exception.InactiveAccountException;
 import com.gym.crm.exception.InvalidCredentialsException;
 import com.gym.crm.exception.UnauthorizedAccessException;
 import com.gym.crm.util.AuthenticationService;
-import com.gym.crm.util.PasswordEncryption;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

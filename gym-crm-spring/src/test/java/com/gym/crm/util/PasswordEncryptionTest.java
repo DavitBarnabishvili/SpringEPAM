@@ -1,5 +1,6 @@
 package com.gym.crm.util;
 
+import com.gym.crm.util.impl.PasswordEncryption;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 

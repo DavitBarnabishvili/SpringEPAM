@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.web.servlet.NoHandlerFoundException;
 
 import java.time.Instant;
 import java.util.HashMap;
@@ -48,6 +49,12 @@ public class GlobalExceptionHandler {
         String errorMessage = Objects.requireNonNull(ex.getBindingResult().getFieldError()).getDefaultMessage();
         return buildResponse(HttpStatus.BAD_REQUEST, errorMessage);
     }
+
+    @ExceptionHandler(NoHandlerFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleNotFound(NoHandlerFoundException ex) {
+        return buildResponse(HttpStatus.NOT_FOUND, "Resource not found: " + ex.getRequestURL());
+    }
+
 
     // Handle any other uncaught exceptions (500)
     @ExceptionHandler(Exception.class)

@@ -9,7 +9,7 @@ import com.gym.crm.exception.UserNotFoundException;
 import com.gym.crm.service.TraineeService;
 import com.gym.crm.util.AuthenticationService;
 import com.gym.crm.util.CredentialsGeneratorService;
-import com.gym.crm.util.PasswordEncryption;
+import com.gym.crm.util.impl.PasswordEncryption;
 import com.gym.crm.util.ValidationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

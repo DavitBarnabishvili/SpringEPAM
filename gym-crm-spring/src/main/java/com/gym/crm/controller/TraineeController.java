@@ -26,6 +26,7 @@ import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.gym.crm.service.CustomMetricsService;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -40,13 +41,16 @@ public class TraineeController {
     private final TraineeService traineeService;
     private final TrainerService trainerService;
     private final TraineeTrainerAssignmentDao assignmentDao;
+    private final CustomMetricsService metricsService;
 
     public TraineeController(TraineeService traineeService,
                              TrainerService trainerService,
-                             TraineeTrainerAssignmentDao assignmentDao) {
+                             TraineeTrainerAssignmentDao assignmentDao,
+                             CustomMetricsService metricsService) {
         this.traineeService = traineeService;
         this.trainerService = trainerService;
         this.assignmentDao = assignmentDao;
+        this.metricsService = metricsService;
     }
 
     @PostMapping("/register")
@@ -70,6 +74,7 @@ public class TraineeController {
             );
 
             Trainee created = traineeService.createTrainee(trainee);
+            metricsService.incrementTraineeRegistration();
 
             RegistrationResponse response = new RegistrationResponse(
                     created.getUsername(),

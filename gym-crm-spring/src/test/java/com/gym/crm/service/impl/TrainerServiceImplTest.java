@@ -9,7 +9,7 @@ import com.gym.crm.exception.InvalidCredentialsException;
 import com.gym.crm.service.TrainerService;
 import com.gym.crm.util.AuthenticationService;
 import com.gym.crm.util.CredentialsGeneratorService;
-import com.gym.crm.util.PasswordEncryption;
+import com.gym.crm.util.impl.PasswordEncryption;
 import com.gym.crm.util.ValidationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

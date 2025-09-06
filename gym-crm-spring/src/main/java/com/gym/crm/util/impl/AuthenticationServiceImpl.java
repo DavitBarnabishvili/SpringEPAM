@@ -8,7 +8,6 @@ import com.gym.crm.exception.InactiveAccountException;
 import com.gym.crm.exception.InvalidCredentialsException;
 import com.gym.crm.exception.UnauthorizedAccessException;
 import com.gym.crm.util.AuthenticationService;
-import com.gym.crm.util.PasswordEncryption;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;

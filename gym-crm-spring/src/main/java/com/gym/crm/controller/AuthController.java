@@ -22,6 +22,8 @@ import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.gym.crm.service.CustomMetricsService;
+import io.micrometer.core.instrument.Timer;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -37,15 +39,17 @@ public class AuthController {
     private final TraineeService traineeService;
     private final TrainerService trainerService;
     private final JwtUtil jwtUtil;
+    private final CustomMetricsService metricsService;
 
     public AuthController(AuthenticationService authenticationService,
                           TraineeService traineeService,
                           TrainerService trainerService,
-                          JwtUtil jwtUtil) {
+                          JwtUtil jwtUtil, CustomMetricsService metricsService) {
         this.authenticationService = authenticationService;
         this.traineeService = traineeService;
         this.trainerService = trainerService;
         this.jwtUtil = jwtUtil;
+        this.metricsService = metricsService;
     }
 
     //I couldn't figure out how to use Get for login and not expose username and password in the url.
@@ -63,6 +67,9 @@ public class AuthController {
 
         String transactionId = UUID.randomUUID().toString();
         MDC.put("transactionId", transactionId);
+
+        Timer.Sample authTimer = metricsService.startAuthenticationTimer();
+        metricsService.incrementLoginAttempt();
 
         logger.info("Login attempt for username: {}", username);
 
@@ -85,6 +92,8 @@ public class AuthController {
 
             LoginResponse response = new LoginResponse(token);
 
+            metricsService.incrementLoginSuccess();
+
             logger.info("{} login successful for: {}", role, username);
             return ResponseEntity.ok(response);
 
@@ -92,6 +101,7 @@ public class AuthController {
             logger.warn("Login failed for username: {} - {}", username, e.getMessage());
             throw e;
         } finally {
+            metricsService.stopAuthenticationTimer(authTimer);
             MDC.clear();
         }
     }

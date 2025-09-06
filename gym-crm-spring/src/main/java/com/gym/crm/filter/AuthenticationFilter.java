@@ -28,11 +28,13 @@ public class AuthenticationFilter implements Filter {
             "/api/trainees/register",
             "/api/trainers/register",
             "/api/auth/login",
-            "/api/auth/change-password", // This uses its own auth via request body
             "/api/training-types",
             "/swagger-ui",
             "/api-docs",
             "/v3/api-docs",
+            "/actuator",
+            "/management",
+            "/metrics-dashboard",
             "/h2-console"
     );
 

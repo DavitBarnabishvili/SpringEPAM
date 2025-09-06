@@ -25,6 +25,7 @@ import org.slf4j.MDC;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.gym.crm.service.CustomMetricsService;
 
 import java.time.LocalDate;
 import java.util.*;
@@ -42,13 +43,16 @@ public class TrainingController {
     private final TraineeService traineeService;
     private final TrainerService trainerService;
     private final TrainingTypeDao trainingTypeDao;
+    private final CustomMetricsService metricsService;
 
     public TrainingController(TrainingService trainingService, TraineeService traineeService,
-                              TrainingTypeDao trainingTypeDao, TrainerService trainerService) {
+                              TrainingTypeDao trainingTypeDao, TrainerService trainerService,
+                              CustomMetricsService metricsService) {
         this.trainingService = trainingService;
         this.trainerService = trainerService;
         this.trainingTypeDao = trainingTypeDao;
         this.traineeService = traineeService;
+        this.metricsService = metricsService;
     }
 
     @PostMapping("/trainings")
@@ -104,6 +108,7 @@ public class TrainingController {
             );
 
             trainingService.createTraining(authenticatedUsername, training);
+            metricsService.incrementTrainingCreated();
 
             logger.info("Training added successfully: {}", request.getTrainingName());
             return ResponseEntity.ok().build();
