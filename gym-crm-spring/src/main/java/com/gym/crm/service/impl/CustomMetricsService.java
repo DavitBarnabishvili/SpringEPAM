@@ -1,4 +1,4 @@
-package com.gym.crm.service;
+package com.gym.crm.service.impl;
 
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;

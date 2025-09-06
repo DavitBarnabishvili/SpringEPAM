@@ -25,7 +25,7 @@ import org.slf4j.MDC;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import com.gym.crm.service.CustomMetricsService;
+import com.gym.crm.service.impl.CustomMetricsService;
 
 import java.time.LocalDate;
 import java.util.*;
