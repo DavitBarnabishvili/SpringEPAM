@@ -11,6 +11,8 @@ import com.gym.crm.exception.UnauthorizedAccessException;
 import com.gym.crm.util.AuthenticationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -20,7 +22,6 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -46,292 +47,422 @@ class AuthenticationServiceImplTest {
         testTrainee = new Trainee("John", "Doe", LocalDate.of(1990, 1, 1), "123 Test St");
         testTrainee.setId(1L);
         testTrainee.setUsername("john.doe");
-        testTrainee.setPassword("encodedPassword");
+        testTrainee.setPassword("$2a$12$encodedBCryptPassword");
         testTrainee.setIsActive(true);
 
         TrainingType specialization = new TrainingType("Cardio");
         testTrainer = new Trainer("Jane", "Smith", specialization);
         testTrainer.setId(2L);
         testTrainer.setUsername("jane.smith");
-        testTrainer.setPassword("encodedPassword");
+        testTrainer.setPassword("$2a$12$encodedBCryptPassword");
         testTrainer.setIsActive(true);
     }
 
-    @Test
-    void authenticateTrainee_ShouldReturnTrainee_WhenCredentialsValid() {
-        when(traineeDao.findByUsername("john.doe")).thenReturn(Optional.of(testTrainee));
-        when(passwordEncryption.isEncoded("encodedPassword")).thenReturn(true);
-        when(passwordEncryption.matches("password", "encodedPassword")).thenReturn(true);
+    @Nested
+    @DisplayName("Trainee Authentication Tests")
+    class TraineeAuthenticationTests {
 
-        Trainee authenticated = authenticationService.authenticateTrainee("john.doe", "password");
+        @Test
+        @DisplayName("Should return trainee when credentials are valid")
+        void authenticateTrainee_ShouldReturnTrainee_WhenCredentialsValid() {
+            when(traineeDao.findByUsername("john.doe")).thenReturn(Optional.of(testTrainee));
+            when(passwordEncryption.matches("password", "$2a$12$encodedBCryptPassword")).thenReturn(true);
 
-        assertThat(authenticated).isEqualTo(testTrainee);
-        assertThat(authenticated.getUsername()).isEqualTo("john.doe");
+            Trainee authenticated = authenticationService.authenticateTrainee("john.doe", "password");
+
+            assertThat(authenticated).isEqualTo(testTrainee);
+            assertThat(authenticated.getUsername()).isEqualTo("john.doe");
+            verify(passwordEncryption).matches("password", "$2a$12$encodedBCryptPassword");
+        }
+
+        @Test
+        @DisplayName("Should throw exception when username is null")
+        void authenticateTrainee_ShouldThrowException_WhenUsernameNull() {
+            assertThatThrownBy(() -> authenticationService.authenticateTrainee(null, "password"))
+                    .isInstanceOf(InvalidCredentialsException.class)
+                    .hasMessage("Username is required");
+        }
+
+        @Test
+        @DisplayName("Should throw exception when username is empty")
+        void authenticateTrainee_ShouldThrowException_WhenUsernameEmpty() {
+            assertThatThrownBy(() -> authenticationService.authenticateTrainee("", "password"))
+                    .isInstanceOf(InvalidCredentialsException.class)
+                    .hasMessage("Username is required");
+        }
+
+        @Test
+        @DisplayName("Should throw exception when password is null")
+        void authenticateTrainee_ShouldThrowException_WhenPasswordNull() {
+            assertThatThrownBy(() -> authenticationService.authenticateTrainee("john.doe", null))
+                    .isInstanceOf(InvalidCredentialsException.class)
+                    .hasMessage("Password is required");
+        }
+
+        @Test
+        @DisplayName("Should throw exception when password is empty")
+        void authenticateTrainee_ShouldThrowException_WhenPasswordEmpty() {
+            assertThatThrownBy(() -> authenticationService.authenticateTrainee("john.doe", ""))
+                    .isInstanceOf(InvalidCredentialsException.class)
+                    .hasMessage("Password is required");
+        }
+
+        @Test
+        @DisplayName("Should throw exception when username not found")
+        void authenticateTrainee_ShouldThrowException_WhenUsernameNotFound() {
+            when(traineeDao.findByUsername("nonexistent")).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> authenticationService.authenticateTrainee("nonexistent", "password"))
+                    .isInstanceOf(InvalidCredentialsException.class)
+                    .hasMessage("Invalid username or password");
+        }
+
+        @Test
+        @DisplayName("Should throw exception when password is incorrect")
+        void authenticateTrainee_ShouldThrowException_WhenPasswordIncorrect() {
+            when(traineeDao.findByUsername("john.doe")).thenReturn(Optional.of(testTrainee));
+            when(passwordEncryption.matches("wrongPassword", "$2a$12$encodedBCryptPassword")).thenReturn(false);
+
+            assertThatThrownBy(() -> authenticationService.authenticateTrainee("john.doe", "wrongPassword"))
+                    .isInstanceOf(InvalidCredentialsException.class)
+                    .hasMessage("Invalid username or password");
+        }
+
+        @Test
+        @DisplayName("Should throw exception when account is inactive")
+        void authenticateTrainee_ShouldThrowException_WhenAccountInactive() {
+            testTrainee.setIsActive(false);
+            when(traineeDao.findByUsername("john.doe")).thenReturn(Optional.of(testTrainee));
+            when(passwordEncryption.matches("password", "$2a$12$encodedBCryptPassword")).thenReturn(true);
+
+            assertThatThrownBy(() -> authenticationService.authenticateTrainee("john.doe", "password"))
+                    .isInstanceOf(InactiveAccountException.class)
+                    .hasMessage("This account is inactive");
+        }
+
+        @Test
+        @DisplayName("Should return true for valid trainee credentials")
+        void isValidTraineeCredentials_ShouldReturnTrue_WhenCredentialsValid() {
+            when(traineeDao.findByUsername("john.doe")).thenReturn(Optional.of(testTrainee));
+            when(passwordEncryption.matches("password", "$2a$12$encodedBCryptPassword")).thenReturn(true);
+
+            boolean valid = authenticationService.isValidTraineeCredentials("john.doe", "password");
+
+            assertThat(valid).isTrue();
+        }
+
+        @Test
+        @DisplayName("Should return false for invalid trainee credentials")
+        void isValidTraineeCredentials_ShouldReturnFalse_WhenCredentialsInvalid() {
+            when(traineeDao.findByUsername("john.doe")).thenReturn(Optional.empty());
+
+            boolean valid = authenticationService.isValidTraineeCredentials("john.doe", "password");
+
+            assertThat(valid).isFalse();
+        }
+
+        @Test
+        @DisplayName("Should return false when trainee password doesn't match")
+        void isValidTraineeCredentials_ShouldReturnFalse_WhenPasswordIncorrect() {
+            when(traineeDao.findByUsername("john.doe")).thenReturn(Optional.of(testTrainee));
+            when(passwordEncryption.matches("wrongPassword", "$2a$12$encodedBCryptPassword")).thenReturn(false);
+
+            boolean valid = authenticationService.isValidTraineeCredentials("john.doe", "wrongPassword");
+
+            assertThat(valid).isFalse();
+        }
+
+        @Test
+        @DisplayName("Should return false when trainee account is inactive")
+        void isValidTraineeCredentials_ShouldReturnFalse_WhenAccountInactive() {
+            testTrainee.setIsActive(false);
+            when(traineeDao.findByUsername("john.doe")).thenReturn(Optional.of(testTrainee));
+            when(passwordEncryption.matches("password", "$2a$12$encodedBCryptPassword")).thenReturn(true);
+
+            boolean valid = authenticationService.isValidTraineeCredentials("john.doe", "password");
+
+            assertThat(valid).isFalse();
+        }
     }
 
-    @Test
-    void authenticateTrainee_ShouldMigratePassword_WhenNotEncoded() {
-        testTrainee.setPassword("plainPassword");
-        when(traineeDao.findByUsername("john.doe")).thenReturn(Optional.of(testTrainee));
-        when(passwordEncryption.isEncoded("plainPassword")).thenReturn(false);
-        when(passwordEncryption.encode("plainPassword")).thenReturn("newEncodedPassword");
-        when(traineeDao.update(any(Trainee.class))).thenReturn(testTrainee);
+    @Nested
+    @DisplayName("Trainer Authentication Tests")
+    class TrainerAuthenticationTests {
 
-        Trainee authenticated = authenticationService.authenticateTrainee("john.doe", "plainPassword");
+        @Test
+        @DisplayName("Should return trainer when credentials are valid")
+        void authenticateTrainer_ShouldReturnTrainer_WhenCredentialsValid() {
+            when(trainerDao.findByUsername("jane.smith")).thenReturn(Optional.of(testTrainer));
+            when(passwordEncryption.matches("password", "$2a$12$encodedBCryptPassword")).thenReturn(true);
 
-        assertThat(authenticated).isEqualTo(testTrainee);
-        verify(passwordEncryption).encode("plainPassword");
-        verify(traineeDao).update(argThat(t -> t.getPassword().equals("newEncodedPassword")));
+            Trainer authenticated = authenticationService.authenticateTrainer("jane.smith", "password");
+
+            assertThat(authenticated).isEqualTo(testTrainer);
+            assertThat(authenticated.getUsername()).isEqualTo("jane.smith");
+            verify(passwordEncryption).matches("password", "$2a$12$encodedBCryptPassword");
+        }
+
+        @Test
+        @DisplayName("Should throw exception when username is null")
+        void authenticateTrainer_ShouldThrowException_WhenUsernameNull() {
+            assertThatThrownBy(() -> authenticationService.authenticateTrainer(null, "password"))
+                    .isInstanceOf(InvalidCredentialsException.class)
+                    .hasMessage("Username is required");
+        }
+
+        @Test
+        @DisplayName("Should throw exception when password is null")
+        void authenticateTrainer_ShouldThrowException_WhenPasswordNull() {
+            assertThatThrownBy(() -> authenticationService.authenticateTrainer("jane.smith", null))
+                    .isInstanceOf(InvalidCredentialsException.class)
+                    .hasMessage("Password is required");
+        }
+
+        @Test
+        @DisplayName("Should throw exception when username not found")
+        void authenticateTrainer_ShouldThrowException_WhenUsernameNotFound() {
+            when(trainerDao.findByUsername("nonexistent")).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> authenticationService.authenticateTrainer("nonexistent", "password"))
+                    .isInstanceOf(InvalidCredentialsException.class)
+                    .hasMessage("Invalid username or password");
+        }
+
+        @Test
+        @DisplayName("Should throw exception when password is incorrect")
+        void authenticateTrainer_ShouldThrowException_WhenPasswordIncorrect() {
+            when(trainerDao.findByUsername("jane.smith")).thenReturn(Optional.of(testTrainer));
+            when(passwordEncryption.matches("wrongPassword", "$2a$12$encodedBCryptPassword")).thenReturn(false);
+
+            assertThatThrownBy(() -> authenticationService.authenticateTrainer("jane.smith", "wrongPassword"))
+                    .isInstanceOf(InvalidCredentialsException.class)
+                    .hasMessage("Invalid username or password");
+        }
+
+        @Test
+        @DisplayName("Should throw exception when account is inactive")
+        void authenticateTrainer_ShouldThrowException_WhenAccountInactive() {
+            testTrainer.setIsActive(false);
+            when(trainerDao.findByUsername("jane.smith")).thenReturn(Optional.of(testTrainer));
+            when(passwordEncryption.matches("password", "$2a$12$encodedBCryptPassword")).thenReturn(true);
+
+            assertThatThrownBy(() -> authenticationService.authenticateTrainer("jane.smith", "password"))
+                    .isInstanceOf(InactiveAccountException.class)
+                    .hasMessage("This account is inactive");
+        }
+
+        @Test
+        @DisplayName("Should return true for valid trainer credentials")
+        void isValidTrainerCredentials_ShouldReturnTrue_WhenCredentialsValid() {
+            when(trainerDao.findByUsername("jane.smith")).thenReturn(Optional.of(testTrainer));
+            when(passwordEncryption.matches("password", "$2a$12$encodedBCryptPassword")).thenReturn(true);
+
+            boolean valid = authenticationService.isValidTrainerCredentials("jane.smith", "password");
+
+            assertThat(valid).isTrue();
+        }
+
+        @Test
+        @DisplayName("Should return false for invalid trainer credentials")
+        void isValidTrainerCredentials_ShouldReturnFalse_WhenCredentialsInvalid() {
+            when(trainerDao.findByUsername("jane.smith")).thenReturn(Optional.of(testTrainer));
+            when(passwordEncryption.matches("wrongPassword", "$2a$12$encodedBCryptPassword")).thenReturn(false);
+
+            boolean valid = authenticationService.isValidTrainerCredentials("jane.smith", "wrongPassword");
+
+            assertThat(valid).isFalse();
+        }
+
+        @Test
+        @DisplayName("Should return false when trainer not found")
+        void isValidTrainerCredentials_ShouldReturnFalse_WhenTrainerNotFound() {
+            when(trainerDao.findByUsername("nonexistent")).thenReturn(Optional.empty());
+
+            boolean valid = authenticationService.isValidTrainerCredentials("nonexistent", "password");
+
+            assertThat(valid).isFalse();
+        }
+
+        @Test
+        @DisplayName("Should return false when trainer account is inactive")
+        void isValidTrainerCredentials_ShouldReturnFalse_WhenAccountInactive() {
+            testTrainer.setIsActive(false);
+            when(trainerDao.findByUsername("jane.smith")).thenReturn(Optional.of(testTrainer));
+            when(passwordEncryption.matches("password", "$2a$12$encodedBCryptPassword")).thenReturn(true);
+
+            boolean valid = authenticationService.isValidTrainerCredentials("jane.smith", "password");
+
+            assertThat(valid).isFalse();
+        }
     }
 
-    @Test
-    void authenticateTrainee_ShouldThrowException_WhenUsernameNull() {
-        assertThatThrownBy(() -> authenticationService.authenticateTrainee(null, "password"))
-                .isInstanceOf(InvalidCredentialsException.class)
-                .hasMessage("Username is required");
+    @Nested
+    @DisplayName("Access Validation Tests")
+    class AccessValidationTests {
+
+        @Test
+        @DisplayName("Should pass validation when trainee username matches")
+        void validateTraineeAccess_ShouldPass_WhenUsernameMatches() {
+            when(traineeDao.findById(1L)).thenReturn(Optional.of(testTrainee));
+
+            authenticationService.validateTraineeAccess("john.doe", 1L);
+
+            verify(traineeDao).findById(1L);
+        }
+
+        @Test
+        @DisplayName("Should throw exception when trainee username doesn't match")
+        void validateTraineeAccess_ShouldThrowException_WhenUsernameDoesNotMatch() {
+            when(traineeDao.findById(1L)).thenReturn(Optional.of(testTrainee));
+
+            assertThatThrownBy(() -> authenticationService.validateTraineeAccess("other.user", 1L))
+                    .isInstanceOf(UnauthorizedAccessException.class)
+                    .hasMessage("Users can only modify their own profile");
+        }
+
+        @Test
+        @DisplayName("Should throw exception when trainee not found")
+        void validateTraineeAccess_ShouldThrowException_WhenTraineeNotFound() {
+            when(traineeDao.findById(999L)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> authenticationService.validateTraineeAccess("john.doe", 999L))
+                    .isInstanceOf(UnauthorizedAccessException.class)
+                    .hasMessage("Target trainee not found");
+        }
+
+        @Test
+        @DisplayName("Should throw exception when trainee validation parameters are null")
+        void validateTraineeAccess_ShouldThrowException_WhenParametersNull() {
+            assertThatThrownBy(() -> authenticationService.validateTraineeAccess(null, 1L))
+                    .isInstanceOf(UnauthorizedAccessException.class)
+                    .hasMessage("Invalid access validation parameters");
+
+            assertThatThrownBy(() -> authenticationService.validateTraineeAccess("john.doe", null))
+                    .isInstanceOf(UnauthorizedAccessException.class)
+                    .hasMessage("Invalid access validation parameters");
+        }
+
+        @Test
+        @DisplayName("Should pass validation when trainer username matches")
+        void validateTrainerAccess_ShouldPass_WhenUsernameMatches() {
+            when(trainerDao.findById(2L)).thenReturn(Optional.of(testTrainer));
+
+            authenticationService.validateTrainerAccess("jane.smith", 2L);
+
+            verify(trainerDao).findById(2L);
+        }
+
+        @Test
+        @DisplayName("Should throw exception when trainer username doesn't match")
+        void validateTrainerAccess_ShouldThrowException_WhenUsernameDoesNotMatch() {
+            when(trainerDao.findById(2L)).thenReturn(Optional.of(testTrainer));
+
+            assertThatThrownBy(() -> authenticationService.validateTrainerAccess("other.user", 2L))
+                    .isInstanceOf(UnauthorizedAccessException.class)
+                    .hasMessage("Users can only modify their own profile");
+        }
+
+        @Test
+        @DisplayName("Should throw exception when trainer not found")
+        void validateTrainerAccess_ShouldThrowException_WhenTrainerNotFound() {
+            when(trainerDao.findById(999L)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> authenticationService.validateTrainerAccess("jane.smith", 999L))
+                    .isInstanceOf(UnauthorizedAccessException.class)
+                    .hasMessage("Target trainer not found");
+        }
+
+        @Test
+        @DisplayName("Should throw exception when trainer validation parameters are null")
+        void validateTrainerAccess_ShouldThrowException_WhenParametersNull() {
+            assertThatThrownBy(() -> authenticationService.validateTrainerAccess(null, 2L))
+                    .isInstanceOf(UnauthorizedAccessException.class)
+                    .hasMessage("Invalid access validation parameters");
+
+            assertThatThrownBy(() -> authenticationService.validateTrainerAccess("jane.smith", null))
+                    .isInstanceOf(UnauthorizedAccessException.class)
+                    .hasMessage("Invalid access validation parameters");
+        }
     }
 
-    @Test
-    void authenticateTrainee_ShouldThrowException_WhenUsernameEmpty() {
-        assertThatThrownBy(() -> authenticationService.authenticateTrainee("", "password"))
-                .isInstanceOf(InvalidCredentialsException.class)
-                .hasMessage("Username is required");
-    }
+    @Nested
+    @DisplayName("Edge Cases and Error Handling")
+    class EdgeCasesTests {
 
-    @Test
-    void authenticateTrainee_ShouldThrowException_WhenPasswordNull() {
-        assertThatThrownBy(() -> authenticationService.authenticateTrainee("john.doe", null))
-                .isInstanceOf(InvalidCredentialsException.class)
-                .hasMessage("Password is required");
-    }
+        @Test
+        @DisplayName("Should handle whitespace in usernames")
+        void shouldHandleWhitespaceInUsernames() {
+            assertThatThrownBy(() -> authenticationService.authenticateTrainee(" ", "password"))
+                    .isInstanceOf(InvalidCredentialsException.class)
+                    .hasMessage("Username is required");
 
-    @Test
-    void authenticateTrainee_ShouldThrowException_WhenPasswordEmpty() {
-        assertThatThrownBy(() -> authenticationService.authenticateTrainee("john.doe", ""))
-                .isInstanceOf(InvalidCredentialsException.class)
-                .hasMessage("Password is required");
-    }
+            assertThatThrownBy(() -> authenticationService.authenticateTrainer("  ", "password"))
+                    .isInstanceOf(InvalidCredentialsException.class)
+                    .hasMessage("Username is required");
+        }
 
-    @Test
-    void authenticateTrainee_ShouldThrowException_WhenUsernameNotFound() {
-        when(traineeDao.findByUsername("nonexistent")).thenReturn(Optional.empty());
+        @Test
+        @DisplayName("Should handle whitespace in passwords")
+        void shouldHandleWhitespaceInPasswords() {
+            assertThatThrownBy(() -> authenticationService.authenticateTrainee("john.doe", " "))
+                    .isInstanceOf(InvalidCredentialsException.class)
+                    .hasMessage("Password is required");
 
-        assertThatThrownBy(() -> authenticationService.authenticateTrainee("nonexistent", "password"))
-                .isInstanceOf(InvalidCredentialsException.class)
-                .hasMessage("Invalid username or password");
-    }
+            assertThatThrownBy(() -> authenticationService.authenticateTrainer("jane.smith", "  "))
+                    .isInstanceOf(InvalidCredentialsException.class)
+                    .hasMessage("Password is required");
+        }
 
-    @Test
-    void authenticateTrainee_ShouldThrowException_WhenPasswordIncorrect() {
-        when(traineeDao.findByUsername("john.doe")).thenReturn(Optional.of(testTrainee));
-        when(passwordEncryption.isEncoded("encodedPassword")).thenReturn(true);
-        when(passwordEncryption.matches("wrongPassword", "encodedPassword")).thenReturn(false);
+        @Test
+        @DisplayName("Should handle case sensitivity in usernames")
+        void shouldHandleCaseSensitivityInUsernames() {
+            when(traineeDao.findByUsername("JOHN.DOE")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> authenticationService.authenticateTrainee("john.doe", "wrongPassword"))
-                .isInstanceOf(InvalidCredentialsException.class)
-                .hasMessage("Invalid username or password");
-    }
+            assertThatThrownBy(() -> authenticationService.authenticateTrainee("JOHN.DOE", "password"))
+                    .isInstanceOf(InvalidCredentialsException.class)
+                    .hasMessage("Invalid username or password");
+        }
 
-    @Test
-    void authenticateTrainee_ShouldThrowException_WhenAccountInactive() {
-        testTrainee.setIsActive(false);
-        when(traineeDao.findByUsername("john.doe")).thenReturn(Optional.of(testTrainee));
-        when(passwordEncryption.isEncoded("encodedPassword")).thenReturn(true);
-        when(passwordEncryption.matches("password", "encodedPassword")).thenReturn(true);
+        @Test
+        @DisplayName("Should handle very long usernames")
+        void shouldHandleVeryLongUsernames() {
+            String longUsername = "a".repeat(1000);
+            when(traineeDao.findByUsername(longUsername)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> authenticationService.authenticateTrainee("john.doe", "password"))
-                .isInstanceOf(InactiveAccountException.class)
-                .hasMessage("This account is inactive");
-    }
+            assertThatThrownBy(() -> authenticationService.authenticateTrainee(longUsername, "password"))
+                    .isInstanceOf(InvalidCredentialsException.class)
+                    .hasMessage("Invalid username or password");
+        }
 
-    @Test
-    void authenticateTrainer_ShouldReturnTrainer_WhenCredentialsValid() {
-        when(trainerDao.findByUsername("jane.smith")).thenReturn(Optional.of(testTrainer));
-        when(passwordEncryption.isEncoded("encodedPassword")).thenReturn(true);
-        when(passwordEncryption.matches("password", "encodedPassword")).thenReturn(true);
+        @Test
+        @DisplayName("Should handle very long passwords")
+        void shouldHandleVeryLongPasswords() {
+            String longPassword = "a".repeat(1000);
+            when(traineeDao.findByUsername("john.doe")).thenReturn(Optional.of(testTrainee));
+            when(passwordEncryption.matches(longPassword, "$2a$12$encodedBCryptPassword")).thenReturn(false);
 
-        Trainer authenticated = authenticationService.authenticateTrainer("jane.smith", "password");
+            assertThatThrownBy(() -> authenticationService.authenticateTrainee("john.doe", longPassword))
+                    .isInstanceOf(InvalidCredentialsException.class)
+                    .hasMessage("Invalid username or password");
+        }
 
-        assertThat(authenticated).isEqualTo(testTrainer);
-        assertThat(authenticated.getUsername()).isEqualTo("jane.smith");
-    }
+        @Test
+        @DisplayName("Should handle special characters in usernames and passwords")
+        void shouldHandleSpecialCharacters() {
+            String specialUsername = "user@domain.com";
+            String specialPassword = "P@ssw0rd!#$%";
 
-    @Test
-    void authenticateTrainer_ShouldMigratePassword_WhenNotEncoded() {
-        testTrainer.setPassword("plainPassword");
-        when(trainerDao.findByUsername("jane.smith")).thenReturn(Optional.of(testTrainer));
-        when(passwordEncryption.isEncoded("plainPassword")).thenReturn(false);
-        when(passwordEncryption.encode("plainPassword")).thenReturn("newEncodedPassword");
-        when(trainerDao.update(any(Trainer.class))).thenReturn(testTrainer);
+            Trainee specialTrainee = new Trainee("Special", "User", LocalDate.of(1990, 1, 1), "123 Test St");
+            specialTrainee.setUsername(specialUsername);
+            specialTrainee.setPassword("$2a$12$encodedSpecialPassword");
+            specialTrainee.setIsActive(true);
 
-        Trainer authenticated = authenticationService.authenticateTrainer("jane.smith", "plainPassword");
+            when(traineeDao.findByUsername(specialUsername)).thenReturn(Optional.of(specialTrainee));
+            when(passwordEncryption.matches(specialPassword, "$2a$12$encodedSpecialPassword")).thenReturn(true);
 
-        assertThat(authenticated).isEqualTo(testTrainer);
-        verify(passwordEncryption).encode("plainPassword");
-        verify(trainerDao).update(argThat(t -> t.getPassword().equals("newEncodedPassword")));
-    }
+            Trainee authenticated = authenticationService.authenticateTrainee(specialUsername, specialPassword);
 
-    @Test
-    void authenticateTrainer_ShouldThrowException_WhenUsernameNull() {
-        assertThatThrownBy(() -> authenticationService.authenticateTrainer(null, "password"))
-                .isInstanceOf(InvalidCredentialsException.class)
-                .hasMessage("Username is required");
-    }
-
-    @Test
-    void authenticateTrainer_ShouldThrowException_WhenPasswordNull() {
-        assertThatThrownBy(() -> authenticationService.authenticateTrainer("jane.smith", null))
-                .isInstanceOf(InvalidCredentialsException.class)
-                .hasMessage("Password is required");
-    }
-
-    @Test
-    void authenticateTrainer_ShouldThrowException_WhenUsernameNotFound() {
-        when(trainerDao.findByUsername("nonexistent")).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> authenticationService.authenticateTrainer("nonexistent", "password"))
-                .isInstanceOf(InvalidCredentialsException.class)
-                .hasMessage("Invalid username or password");
-    }
-
-    @Test
-    void authenticateTrainer_ShouldThrowException_WhenPasswordIncorrect() {
-        when(trainerDao.findByUsername("jane.smith")).thenReturn(Optional.of(testTrainer));
-        when(passwordEncryption.isEncoded("encodedPassword")).thenReturn(true);
-        when(passwordEncryption.matches("wrongPassword", "encodedPassword")).thenReturn(false);
-
-        assertThatThrownBy(() -> authenticationService.authenticateTrainer("jane.smith", "wrongPassword"))
-                .isInstanceOf(InvalidCredentialsException.class)
-                .hasMessage("Invalid username or password");
-    }
-
-    @Test
-    void authenticateTrainer_ShouldThrowException_WhenAccountInactive() {
-        testTrainer.setIsActive(false);
-        when(trainerDao.findByUsername("jane.smith")).thenReturn(Optional.of(testTrainer));
-        when(passwordEncryption.isEncoded("encodedPassword")).thenReturn(true);
-        when(passwordEncryption.matches("password", "encodedPassword")).thenReturn(true);
-
-        assertThatThrownBy(() -> authenticationService.authenticateTrainer("jane.smith", "password"))
-                .isInstanceOf(InactiveAccountException.class)
-                .hasMessage("This account is inactive");
-    }
-
-    @Test
-    void validateTraineeAccess_ShouldPass_WhenUsernameMatches() {
-        when(traineeDao.findById(1L)).thenReturn(Optional.of(testTrainee));
-
-        authenticationService.validateTraineeAccess("john.doe", 1L);
-
-        verify(traineeDao).findById(1L);
-    }
-
-    @Test
-    void validateTraineeAccess_ShouldThrowException_WhenUsernameDoesNotMatch() {
-        when(traineeDao.findById(1L)).thenReturn(Optional.of(testTrainee));
-
-        assertThatThrownBy(() -> authenticationService.validateTraineeAccess("other.user", 1L))
-                .isInstanceOf(UnauthorizedAccessException.class)
-                .hasMessage("Users can only modify their own profile");
-    }
-
-    @Test
-    void validateTraineeAccess_ShouldThrowException_WhenTraineeNotFound() {
-        when(traineeDao.findById(999L)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> authenticationService.validateTraineeAccess("john.doe", 999L))
-                .isInstanceOf(UnauthorizedAccessException.class)
-                .hasMessage("Target trainee not found");
-    }
-
-    @Test
-    void validateTraineeAccess_ShouldThrowException_WhenParametersNull() {
-        assertThatThrownBy(() -> authenticationService.validateTraineeAccess(null, 1L))
-                .isInstanceOf(UnauthorizedAccessException.class)
-                .hasMessage("Invalid access validation parameters");
-
-        assertThatThrownBy(() -> authenticationService.validateTraineeAccess("john.doe", null))
-                .isInstanceOf(UnauthorizedAccessException.class)
-                .hasMessage("Invalid access validation parameters");
-    }
-
-    @Test
-    void validateTrainerAccess_ShouldPass_WhenUsernameMatches() {
-        when(trainerDao.findById(2L)).thenReturn(Optional.of(testTrainer));
-
-        authenticationService.validateTrainerAccess("jane.smith", 2L);
-
-        verify(trainerDao).findById(2L);
-    }
-
-    @Test
-    void validateTrainerAccess_ShouldThrowException_WhenUsernameDoesNotMatch() {
-        when(trainerDao.findById(2L)).thenReturn(Optional.of(testTrainer));
-
-        assertThatThrownBy(() -> authenticationService.validateTrainerAccess("other.user", 2L))
-                .isInstanceOf(UnauthorizedAccessException.class)
-                .hasMessage("Users can only modify their own profile");
-    }
-
-    @Test
-    void validateTrainerAccess_ShouldThrowException_WhenTrainerNotFound() {
-        when(trainerDao.findById(999L)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> authenticationService.validateTrainerAccess("jane.smith", 999L))
-                .isInstanceOf(UnauthorizedAccessException.class)
-                .hasMessage("Target trainer not found");
-    }
-
-    @Test
-    void validateTrainerAccess_ShouldThrowException_WhenParametersNull() {
-        assertThatThrownBy(() -> authenticationService.validateTrainerAccess(null, 2L))
-                .isInstanceOf(UnauthorizedAccessException.class)
-                .hasMessage("Invalid access validation parameters");
-
-        assertThatThrownBy(() -> authenticationService.validateTrainerAccess("jane.smith", null))
-                .isInstanceOf(UnauthorizedAccessException.class)
-                .hasMessage("Invalid access validation parameters");
-    }
-
-    @Test
-    void isValidTraineeCredentials_ShouldReturnTrue_WhenCredentialsValid() {
-        when(traineeDao.findByUsername("john.doe")).thenReturn(Optional.of(testTrainee));
-        when(passwordEncryption.isEncoded("encodedPassword")).thenReturn(true);
-        when(passwordEncryption.matches("password", "encodedPassword")).thenReturn(true);
-
-        boolean valid = authenticationService.isValidTraineeCredentials("john.doe", "password");
-
-        assertThat(valid).isTrue();
-    }
-
-    @Test
-    void isValidTraineeCredentials_ShouldReturnFalse_WhenCredentialsInvalid() {
-        when(traineeDao.findByUsername("john.doe")).thenReturn(Optional.empty());
-
-        boolean valid = authenticationService.isValidTraineeCredentials("john.doe", "password");
-
-        assertThat(valid).isFalse();
-    }
-
-    @Test
-    void isValidTrainerCredentials_ShouldReturnTrue_WhenCredentialsValid() {
-        when(trainerDao.findByUsername("jane.smith")).thenReturn(Optional.of(testTrainer));
-        when(passwordEncryption.isEncoded("encodedPassword")).thenReturn(true);
-        when(passwordEncryption.matches("password", "encodedPassword")).thenReturn(true);
-
-        boolean valid = authenticationService.isValidTrainerCredentials("jane.smith", "password");
-
-        assertThat(valid).isTrue();
-    }
-
-    @Test
-    void isValidTrainerCredentials_ShouldReturnFalse_WhenCredentialsInvalid() {
-        when(trainerDao.findByUsername("jane.smith")).thenReturn(Optional.of(testTrainer));
-        when(passwordEncryption.isEncoded("encodedPassword")).thenReturn(true);
-        when(passwordEncryption.matches("wrongPassword", "encodedPassword")).thenReturn(false);
-
-        boolean valid = authenticationService.isValidTrainerCredentials("jane.smith", "wrongPassword");
-
-        assertThat(valid).isFalse();
+            assertThat(authenticated).isEqualTo(specialTrainee);
+        }
     }
 }
