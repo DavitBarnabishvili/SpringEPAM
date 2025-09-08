@@ -2,6 +2,7 @@ package com.gym.crm.util.impl;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.security.Key;
@@ -10,11 +11,14 @@ import java.util.Date;
 @Component
 public class JwtUtil {
 
-    //this probably shouldn't be hardcoded and should be an environment variable
-    private static final String SECRET = "1a48f384162d40fc7abee842ebd0ff94aa7895aa549605bd0b8f29ca456e5329";
-    private static final long EXPIRATION_TIME = 1000 * 60 * 60 * 24; // 24 hours, too long but good for testing
+    private final Key key;
+    private final long expirationTime;
 
-    private final Key key = Keys.hmacShaKeyFor(SECRET.getBytes());
+    public JwtUtil(@Value("${jwt.secret}") String secret,
+                   @Value("${jwt.expiration:86400000}") long expirationTime) {
+        this.key = Keys.hmacShaKeyFor(secret.getBytes());
+        this.expirationTime = expirationTime;
+    }
 
     public String generateToken(String username, String role, Long userId) {
         return Jwts.builder()
@@ -22,7 +26,7 @@ public class JwtUtil {
                 .claim("role", role)
                 .claim("userId", userId)
                 .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION_TIME))
+                .setExpiration(new Date(System.currentTimeMillis() + expirationTime))
                 .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
     }
@@ -32,16 +36,31 @@ public class JwtUtil {
     }
 
     public String extractUsername(String token) {
-        return parseClaims(token).getSubject();
+        if (token == null || token.trim().isEmpty()) return null;
+        try {
+            return parseClaims(token).getSubject();
+        } catch (JwtException e) {
+            return null;
+        }
     }
 
     public String extractRole(String token) {
-        return parseClaims(token).get("role", String.class);
+        if (token == null || token.trim().isEmpty()) return null;
+        try {
+            return parseClaims(token).get("role", String.class);
+        } catch (JwtException e) {
+            return null;
+        }
     }
 
     public Long extractUserId(String token) {
-        Integer userId = parseClaims(token).get("userId", Integer.class);
-        return userId != null ? userId.longValue() : null;
+        if (token == null || token.trim().isEmpty()) return null;
+        try {
+            Number userId = parseClaims(token).get("userId", Number.class);
+            return userId != null ? userId.longValue() : null;
+        } catch (JwtException e) {
+            return null;
+        }
     }
 
     public boolean validateToken(String token) {

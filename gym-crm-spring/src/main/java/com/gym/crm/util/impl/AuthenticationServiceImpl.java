@@ -10,7 +10,6 @@ import com.gym.crm.exception.UnauthorizedAccessException;
 import com.gym.crm.util.AuthenticationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
@@ -24,14 +23,12 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     private final TrainerDao trainerDao;
     private final PasswordEncryption passwordEncryption;
 
-    @Autowired
     public AuthenticationServiceImpl(TraineeDao traineeDao, TrainerDao trainerDao,
                                      PasswordEncryption passwordEncryption) {
         this.traineeDao = traineeDao;
         this.trainerDao = trainerDao;
         this.passwordEncryption = passwordEncryption;
     }
-
 
     @Override
     public Trainee authenticateTrainee(String username, String password) {
@@ -56,21 +53,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
         Trainee trainee = traineeOpt.get();
 
-        boolean passwordMatches;
-        if (passwordEncryption.isEncoded(trainee.getPassword())) {
-            passwordMatches = passwordEncryption.matches(password, trainee.getPassword());
-        } else {
-            // If we have an unencrypted password from the past, we should handle it
-            passwordMatches = password.equals(trainee.getPassword());
-            if (passwordMatches) {
-                // Migrate to encrypted password on successful login
-                logger.info("Migrating plain text password for trainee: {}", username);
-                trainee.setPassword(passwordEncryption.encode(password));
-                traineeDao.update(trainee);
-            }
-        }
-
-        if (!passwordMatches) {
+        if (!passwordEncryption.matches(password, trainee.getPassword())) {
             logger.warn("Trainee authentication failed: invalid password for username: {}", username);
             throw new InvalidCredentialsException("Invalid username or password");
         }
@@ -107,19 +90,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
         Trainer trainer = trainerOpt.get();
 
-        boolean passwordMatches;
-        if (passwordEncryption.isEncoded(trainer.getPassword())) {
-            passwordMatches = passwordEncryption.matches(password, trainer.getPassword());
-        } else {
-            passwordMatches = password.equals(trainer.getPassword());
-            if (passwordMatches) {
-                logger.info("Migrating plain text password for trainer: {}", username);
-                trainer.setPassword(passwordEncryption.encode(password));
-                trainerDao.update(trainer);
-            }
-        }
-
-        if (!passwordMatches) {
+        if (!passwordEncryption.matches(password, trainer.getPassword())) {
             logger.warn("Trainer authentication failed: invalid password for username: {}", username);
             throw new InvalidCredentialsException("Invalid username or password");
         }
@@ -182,7 +153,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         try {
             authenticateTrainee(username, password);
             return true;
-        } catch (InvalidCredentialsException e) {
+        } catch (InvalidCredentialsException | InactiveAccountException e) {
             return false;
         }
     }
@@ -192,7 +163,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         try {
             authenticateTrainer(username, password);
             return true;
-        } catch (InvalidCredentialsException e) {
+        } catch (InvalidCredentialsException | InactiveAccountException e) {
             return false;
         }
     }

@@ -2,6 +2,7 @@ package com.gym.crm.exception;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.LockedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -35,6 +36,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler({InactiveAccountException.class, UnauthorizedAccessException.class})
     public ResponseEntity<Map<String, Object>> handleForbidden(SecurityException ex) {
         return buildResponse(HttpStatus.FORBIDDEN, ex.getMessage());
+    }
+
+    // Handle locked exception (too many login attempts) (423)
+    @ExceptionHandler(LockedException.class)
+    public ResponseEntity<Map<String, Object>> handleLockedException(LockedException ex) {
+        return buildResponse(HttpStatus.LOCKED, ex.getMessage());
     }
 
     // Handle resources not found during runtime (404)
