@@ -1,0 +1,68 @@
+# Staging Environment Configuration
+server:
+  port: ${PORT:8080}
+
+spring:
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/gymcrm_stg}
+    driver-class-name: org.h2.Driver
+    username: ${DB_USERNAME:stguser}
+    password: ${DB_PASSWORD}
+
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+
+  h2:
+    console:
+      enabled: false
+
+# JWT Configuration - MUST be provided via environment
+jwt:
+  secret: ${JWT_SECRET}
+  expiration: ${JWT_EXPIRATION:3600000}
+
+# Security Configuration
+security:
+  brute-force:
+    max-attempts: ${SECURITY_MAX_ATTEMPTS:5}
+    lock-duration: ${SECURITY_LOCK_DURATION:600000}
+
+# Logging Configuration
+logging:
+  level:
+    root: WARN
+    com.gym.crm: INFO
+    com.gym.crm.security: INFO
+    org.springframework.web: WARN
+    org.springframework.security: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%X{transactionId}] %-5level %logger{36} - %msg%n"
+  file:
+    name: ${LOG_PATH:/var/log}/gym-crm-stg.log
+
+# Actuator - Limited exposure for staging
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+
+# Eureka configuration for staging
+eureka:
+  client:
+    enabled: true
+    service-url:
+      defaultZone: ${EUREKA_SERVER_URL:http://eureka-server:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${spring.application.instance_id:${server.port}}
