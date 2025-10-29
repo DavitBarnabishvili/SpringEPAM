@@ -1,222 +1,444 @@
 package com.gym.crm.service.impl;
 
-
+import com.gym.crm.dao.TrainerDao;
+import com.gym.crm.dto.request.ChangeLoginRequest;
 import com.gym.crm.entity.Trainer;
+import com.gym.crm.entity.TrainingType;
+import com.gym.crm.entity.User;
+import com.gym.crm.exception.InvalidCredentialsException;
+import com.gym.crm.service.TrainerService;
+import com.gym.crm.util.AuthenticationService;
 import com.gym.crm.util.CredentialsGeneratorService;
+import com.gym.crm.util.impl.PasswordEncryption;
 import com.gym.crm.util.ValidationService;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("TrainerServiceImpl Tests")
 class TrainerServiceImplTest {
 
     @Mock
-    private com.gym.crm.dao.TrainerDao mockTrainerDao;
+    private TrainerDao trainerDao;
 
     @Mock
-    private CredentialsGeneratorService mockCredentialsGenerator;
+    private AuthenticationService authenticationService;
 
     @Mock
-    private ValidationService mockValidationService;
+    private CredentialsGeneratorService credentialsGenerator;
 
-    private TrainerServiceImpl trainerService;
-    private com.gym.crm.entity.Trainer testTrainer;
+    @Mock
+    private ValidationService validationService;
+
+    @Mock
+    private PasswordEncryption passwordEncryption;
+
+    private TrainerService trainerService;
+    private Trainer testTrainer;
+    private TrainingType testSpecialization;
 
     @BeforeEach
     void setUp() {
-        trainerService = new TrainerServiceImpl(mockTrainerDao, mockCredentialsGenerator, mockValidationService);
-        com.gym.crm.entity.TrainingType specialization = new com.gym.crm.entity.TrainingType("Cardio");
-        testTrainer = new com.gym.crm.entity.Trainer("Jane", "Smith", specialization);
-        testTrainer.setUserId(1L);
-        testTrainer.setUsername("jane.smith");
-        testTrainer.setPassword("password456");
+        trainerService = new TrainerServiceImpl(
+                trainerDao,
+                authenticationService,
+                credentialsGenerator,
+                validationService,
+                passwordEncryption
+        );
+
+        testSpecialization = new TrainingType("Cardio");
+        testSpecialization.setId(1L);
+
+        testTrainer = new Trainer("John", "Trainer", testSpecialization);
+        testTrainer.setId(1L);
+        testTrainer.setUsername("john.trainer");
+        testTrainer.setPassword("encodedPassword");
+        testTrainer.setIsActive(true);
     }
 
     @Test
-    @DisplayName("createTrainer should throw exception for null trainer")
-    void createTrainer_WithNullTrainer_ShouldThrowException() {
-        assertThrows(IllegalArgumentException.class, () -> trainerService.createTrainer(null));
+    void createTrainer_ShouldGenerateCredentialsAndPersist() {
+        Trainer inputTrainer = new Trainer("John", "Trainer", testSpecialization);
+
+        when(credentialsGenerator.generateUsername("John", "Trainer")).thenReturn("john.trainer");
+        when(credentialsGenerator.generatePassword()).thenReturn("rawPassword123");
+        when(passwordEncryption.encode("rawPassword123")).thenReturn("encodedPassword");
+        when(trainerDao.create(any(Trainer.class))).thenAnswer(invocation -> {
+            Trainer t = invocation.getArgument(0);
+            t.setId(1L);
+            return t;
+        });
+
+        Trainer created = trainerService.createTrainer(inputTrainer);
+
+        assertThat(created).isNotNull();
+        assertThat(created.getUsername()).isEqualTo("john.trainer");
+        assertThat(created.getPassword()).isEqualTo("rawPassword123");
+        assertThat(created.getIsActive()).isTrue();
+        assertThat(created.getSpecialization()).isEqualTo(testSpecialization);
+
+        verify(validationService).validateTrainer(any(Trainer.class));
+        verify(trainerDao).create(any(Trainer.class));
     }
 
     @Test
-    @DisplayName("createTrainer should validate trainer")
-    void createTrainer_ShouldValidateTrainer() {
-        com.gym.crm.entity.Trainer newTrainer = new com.gym.crm.entity.Trainer("John", "Doe");
-        when(mockCredentialsGenerator.generateUsername("John", "Doe")).thenReturn("john.doe");
-        when(mockCredentialsGenerator.generatePassword()).thenReturn("password123");
-        when(mockTrainerDao.create(any(com.gym.crm.entity.Trainer.class))).thenReturn(newTrainer);
-
-        trainerService.createTrainer(newTrainer);
-
-        verify(mockValidationService).validateTrainer(newTrainer);
+    void createTrainer_ShouldThrowException_WhenTrainerIsNull() {
+        assertThatThrownBy(() -> trainerService.createTrainer(null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Trainer cannot be null");
     }
 
     @Test
-    @DisplayName("createTrainer should generate credentials")
-    void createTrainer_ShouldGenerateCredentials() {
-        com.gym.crm.entity.Trainer newTrainer = new com.gym.crm.entity.Trainer("John", "Doe");
-        when(mockCredentialsGenerator.generateUsername("John", "Doe")).thenReturn("john.doe");
-        when(mockCredentialsGenerator.generatePassword()).thenReturn("password123");
-        when(mockTrainerDao.create(any(com.gym.crm.entity.Trainer.class))).thenReturn(newTrainer);
+    void createTrainer_ShouldOverridePresetCredentials() {
+        Trainer inputTrainer = new Trainer("John", "Trainer", testSpecialization);
+        inputTrainer.setUsername("preset.username");
+        inputTrainer.setPassword("preset.password");
 
-        trainerService.createTrainer(newTrainer);
+        when(credentialsGenerator.generateUsername("John", "Trainer")).thenReturn("john.trainer");
+        when(credentialsGenerator.generatePassword()).thenReturn("generatedPassword");
+        when(passwordEncryption.encode("generatedPassword")).thenReturn("encodedPassword");
+        when(trainerDao.create(any(Trainer.class))).thenAnswer(invocation -> {
+            Trainer t = invocation.getArgument(0);
+            t.setId(1L);
+            return t;
+        });
 
-        verify(mockCredentialsGenerator).generateUsername("John", "Doe");
-        verify(mockCredentialsGenerator).generatePassword();
-        assertEquals("john.doe", newTrainer.getUsername());
-        assertEquals("password123", newTrainer.getPassword());
-        assertTrue(newTrainer.getIsActive());
+        Trainer created = trainerService.createTrainer(inputTrainer);
+
+        assertThat(created.getUsername()).isEqualTo("john.trainer");
+        assertThat(created.getPassword()).isEqualTo("generatedPassword");
     }
 
     @Test
-    @DisplayName("createTrainer should save trainer via DAO")
-    void createTrainer_ShouldSaveTrainerViaDao() {
-        com.gym.crm.entity.Trainer newTrainer = new com.gym.crm.entity.Trainer("John", "Doe");
-        when(mockCredentialsGenerator.generateUsername(anyString(), anyString())).thenReturn("john.doe");
-        when(mockCredentialsGenerator.generatePassword()).thenReturn("password123");
-        when(mockTrainerDao.create(newTrainer)).thenReturn(newTrainer);
+    void updateTrainer_ShouldUpdateExistingTrainer() {
+        when(trainerDao.findById(1L)).thenReturn(Optional.of(testTrainer));
+        when(trainerDao.update(any(Trainer.class))).thenReturn(testTrainer);
 
-        com.gym.crm.entity.Trainer result = trainerService.createTrainer(newTrainer);
+        Trainer updatedTrainer = trainerService.updateTrainer("JWT_AUTH", "JWT_AUTH", testTrainer);
 
-        verify(mockTrainerDao).create(newTrainer);
-        assertEquals(newTrainer, result);
+        assertThat(updatedTrainer).isNotNull();
+        assertThat(updatedTrainer.getUsername()).isEqualTo("john.trainer");
+        assertThat(updatedTrainer.getSpecialization()).isEqualTo(testSpecialization);
+
+        verify(validationService).validateTrainer(testTrainer);
+        verify(trainerDao).update(testTrainer);
     }
 
     @Test
-    @DisplayName("updateTrainer should throw exception for null trainer")
-    void updateTrainer_WithNullTrainer_ShouldThrowException() {
-        assertThrows(IllegalArgumentException.class, () -> trainerService.updateTrainer(null));
+    void updateTrainer_ShouldPreserveSpecialization() {
+        TrainingType newSpecialization = new TrainingType("Strength");
+        newSpecialization.setId(2L);
+
+        Trainer updateRequest = new Trainer("John", "Updated", newSpecialization);
+        updateRequest.setId(1L);
+
+        when(trainerDao.findById(1L)).thenReturn(Optional.of(testTrainer));
+        when(trainerDao.update(any(Trainer.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Trainer updated = trainerService.updateTrainer("JWT_AUTH", "JWT_AUTH", updateRequest);
+
+        assertThat(updated.getSpecialization()).isEqualTo(testSpecialization);
+        assertThat(updated.getSpecialization()).isNotEqualTo(newSpecialization);
     }
 
     @Test
-    @DisplayName("updateTrainer should throw exception when trainer has no ID")
-    void updateTrainer_WithoutId_ShouldThrowException() {
-        com.gym.crm.entity.Trainer trainerWithoutId = new com.gym.crm.entity.Trainer("John", "Doe");
+    void updateTrainer_ShouldAuthenticateWhenNotJWT() {
+        when(authenticationService.authenticateTrainer("john.trainer", "password")).thenReturn(testTrainer);
+        when(trainerDao.findById(1L)).thenReturn(Optional.of(testTrainer));
+        when(trainerDao.update(any(Trainer.class))).thenReturn(testTrainer);
 
-        assertThrows(IllegalArgumentException.class, () -> trainerService.updateTrainer(trainerWithoutId));
+        trainerService.updateTrainer("john.trainer", "password", testTrainer);
+
+        verify(authenticationService).authenticateTrainer("john.trainer", "password");
+        verify(authenticationService).validateTrainerAccess("john.trainer", 1L);
     }
 
     @Test
-    @DisplayName("updateTrainer should throw exception when trainer not found")
-    void updateTrainer_WhenTrainerNotFound_ShouldThrowException() {
-        when(mockTrainerDao.findById(1L)).thenReturn(Optional.empty());
+    void updateTrainer_ShouldThrowException_WhenTrainerNotFound() {
+        when(trainerDao.findById(1L)).thenReturn(Optional.empty());
 
-        assertThrows(RuntimeException.class, () -> trainerService.updateTrainer(testTrainer));
+        assertThatThrownBy(() -> trainerService.updateTrainer("JWT_AUTH", "JWT_AUTH", testTrainer))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessage("Trainer not found with id: 1");
     }
 
     @Test
-    @DisplayName("updateTrainer should preserve credentials")
-    void updateTrainer_ShouldPreserveCredentials() {
-        com.gym.crm.entity.Trainer existingTrainer = new com.gym.crm.entity.Trainer("Jane", "Smith");
-        existingTrainer.setUserId(1L);
-        existingTrainer.setUsername("jane.smith");
-        existingTrainer.setPassword("original.password");
-
-        com.gym.crm.entity.TrainingType newSpecialization = new com.gym.crm.entity.TrainingType("Strength");
-        com.gym.crm.entity.Trainer updatedTrainer = new com.gym.crm.entity.Trainer("Jane", "Smith", newSpecialization);
-        updatedTrainer.setUserId(1L);
-
-        when(mockTrainerDao.findById(1L)).thenReturn(Optional.of(existingTrainer));
-        when(mockTrainerDao.update(updatedTrainer)).thenReturn(updatedTrainer);
-
-        trainerService.updateTrainer(updatedTrainer);
-
-        assertEquals("jane.smith", updatedTrainer.getUsername());
-        assertEquals("original.password", updatedTrainer.getPassword());
-        verify(mockTrainerDao).update(updatedTrainer);
+    void updateTrainer_ShouldThrowException_WhenTrainerIsNull() {
+        assertThatThrownBy(() -> trainerService.updateTrainer("user", "pass", null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Trainer cannot be null");
     }
 
     @Test
-    @DisplayName("findTrainerById should return empty for null ID")
-    void findTrainerById_WithNullId_ShouldReturnEmpty() {
-        Optional<com.gym.crm.entity.Trainer> result = trainerService.findTrainerById(null);
-        assertTrue(result.isEmpty());
+    void updateTrainer_ShouldThrowException_WhenIdIsNull() {
+        Trainer trainerWithoutId = new Trainer("John", "Trainer", testSpecialization);
+
+        assertThatThrownBy(() -> trainerService.updateTrainer("user", "pass", trainerWithoutId))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Trainer id is required for update");
     }
 
     @Test
-    @DisplayName("findTrainerById should delegate to DAO")
-    void findTrainerById_ShouldDelegateToDao() {
-        when(mockTrainerDao.findById(1L)).thenReturn(Optional.of(testTrainer));
+    void activateTrainer_ShouldSetActiveTrue() {
+        when(trainerDao.findById(1L)).thenReturn(Optional.of(testTrainer));
+        when(trainerDao.update(any(Trainer.class))).thenReturn(testTrainer);
 
-        Optional<com.gym.crm.entity.Trainer> result = trainerService.findTrainerById(1L);
+        boolean result = trainerService.activateTrainer("JWT_AUTH", "JWT_AUTH", 1L);
 
-        assertTrue(result.isPresent());
-        assertEquals(testTrainer, result.get());
+        assertThat(result).isTrue();
+        verify(trainerDao).update(argThat(User::getIsActive));
     }
 
     @Test
-    @DisplayName("findTrainerByUsername should delegate to DAO")
-    void findTrainerByUsername_ShouldDelegateToDao() {
-        when(mockTrainerDao.findByUsername("jane.smith")).thenReturn(Optional.of(testTrainer));
+    void activateTrainer_ShouldAuthenticateWhenNotJWT() {
+        when(authenticationService.authenticateTrainer("john.trainer", "password")).thenReturn(testTrainer);
+        when(trainerDao.findById(1L)).thenReturn(Optional.of(testTrainer));
+        when(trainerDao.update(any(Trainer.class))).thenReturn(testTrainer);
 
-        Optional<com.gym.crm.entity.Trainer> result = trainerService.findTrainerByUsername("jane.smith");
+        trainerService.activateTrainer("john.trainer", "password", 1L);
 
-        assertTrue(result.isPresent());
-        assertEquals(testTrainer, result.get());
+        verify(authenticationService).authenticateTrainer("john.trainer", "password");
+        verify(authenticationService).validateTrainerAccess("john.trainer", 1L);
     }
 
     @Test
-    @DisplayName("findAllTrainers should delegate to DAO")
-    void findAllTrainers_ShouldDelegateToDao() {
-        List<Trainer> expectedTrainers = List.of(testTrainer);
-        when(mockTrainerDao.findAll()).thenReturn(expectedTrainers);
+    void deactivateTrainer_ShouldSetActiveFalse() {
+        when(trainerDao.findById(1L)).thenReturn(Optional.of(testTrainer));
+        when(trainerDao.update(any(Trainer.class))).thenReturn(testTrainer);
 
-        List<com.gym.crm.entity.Trainer> result = trainerService.findAllTrainers();
+        boolean result = trainerService.deactivateTrainer("JWT_AUTH", "JWT_AUTH", 1L);
 
-        assertEquals(expectedTrainers, result);
+        assertThat(result).isTrue();
+        verify(trainerDao).update(argThat(t -> !t.getIsActive()));
     }
 
     @Test
-    @DisplayName("findTrainersBySpecialization should return empty for null specialization")
-    void findTrainersBySpecialization_WithNullSpecialization_ShouldReturnEmpty() {
-        List<com.gym.crm.entity.Trainer> result = trainerService.findTrainersBySpecialization(null);
-        assertTrue(result.isEmpty());
+    void activateTrainer_ShouldReturnFalse_WhenTrainerNotFound() {
+        when(trainerDao.findById(999L)).thenReturn(Optional.empty());
+
+        boolean result = trainerService.activateTrainer("JWT_AUTH", "JWT_AUTH", 999L);
+
+        assertThat(result).isFalse();
     }
 
     @Test
-    @DisplayName("findTrainersBySpecialization should filter by specialization")
-    void findTrainersBySpecialization_ShouldFilterBySpecialization() {
-        com.gym.crm.entity.TrainingType cardio = new com.gym.crm.entity.TrainingType("Cardio");
-        com.gym.crm.entity.TrainingType strength = new com.gym.crm.entity.TrainingType("Strength");
+    void activateTrainer_ShouldReturnFalse_WhenIdIsNull() {
+        boolean result = trainerService.activateTrainer("JWT_AUTH", "JWT_AUTH", null);
 
-        com.gym.crm.entity.Trainer cardioTrainer = new com.gym.crm.entity.Trainer("John", "Cardio", cardio);
-        com.gym.crm.entity.Trainer strengthTrainer = new com.gym.crm.entity.Trainer("Jane", "Strength", strength);
-
-        when(mockTrainerDao.findAll()).thenReturn(List.of(cardioTrainer, strengthTrainer));
-
-        List<com.gym.crm.entity.Trainer> result = trainerService.findTrainersBySpecialization(cardio);
-
-        assertEquals(1, result.size());
-        assertEquals(cardioTrainer, result.getFirst());
+        assertThat(result).isFalse();
+        verify(trainerDao, never()).findById(any());
     }
 
     @Test
-    @DisplayName("trainerExists should return false for null ID")
-    void trainerExists_WithNullId_ShouldReturnFalse() {
-        assertFalse(trainerService.trainerExists(null));
+    void deactivateTrainer_ShouldReturnFalse_WhenTrainerNotFound() {
+        when(trainerDao.findById(999L)).thenReturn(Optional.empty());
+
+        boolean result = trainerService.deactivateTrainer("JWT_AUTH", "JWT_AUTH", 999L);
+
+        assertThat(result).isFalse();
     }
 
     @Test
-    @DisplayName("trainerExists should delegate to DAO")
-    void trainerExists_ShouldDelegateToDao() {
-        when(mockTrainerDao.existsById(1L)).thenReturn(true);
+    void deactivateTrainer_ShouldReturnFalse_WhenIdIsNull() {
+        boolean result = trainerService.deactivateTrainer("JWT_AUTH", "JWT_AUTH", null);
 
-        assertTrue(trainerService.trainerExists(1L));
-        verify(mockTrainerDao).existsById(1L);
+        assertThat(result).isFalse();
+        verify(trainerDao, never()).findById(any());
+    }
+
+    @Test
+    void findTrainerById_ShouldReturnTrainer_WhenExists() {
+        when(trainerDao.findById(1L)).thenReturn(Optional.of(testTrainer));
+
+        Optional<Trainer> found = trainerService.findTrainerById(1L);
+
+        assertThat(found).isPresent();
+        assertThat(found.get().getUsername()).isEqualTo("john.trainer");
+    }
+
+    @Test
+    void findTrainerById_ShouldReturnEmpty_WhenNotExists() {
+        when(trainerDao.findById(999L)).thenReturn(Optional.empty());
+
+        Optional<Trainer> found = trainerService.findTrainerById(999L);
+
+        assertThat(found).isEmpty();
+    }
+
+    @Test
+    void findTrainerById_ShouldReturnEmpty_WhenIdIsNull() {
+        Optional<Trainer> found = trainerService.findTrainerById(null);
+
+        assertThat(found).isEmpty();
+        verify(trainerDao, never()).findById(any());
+    }
+
+    @Test
+    void findTrainerByUsername_ShouldReturnTrainer_WhenExists() {
+        when(trainerDao.findByUsername("john.trainer")).thenReturn(Optional.of(testTrainer));
+
+        Optional<Trainer> found = trainerService.findTrainerByUsername("john.trainer");
+
+        assertThat(found).isPresent();
+        assertThat(found.get().getUsername()).isEqualTo("john.trainer");
+    }
+
+    @Test
+    void findTrainerByUsername_ShouldReturnEmpty_WhenNotExists() {
+        when(trainerDao.findByUsername("nonexistent")).thenReturn(Optional.empty());
+
+        Optional<Trainer> found = trainerService.findTrainerByUsername("nonexistent");
+
+        assertThat(found).isEmpty();
+    }
+
+    @Test
+    void findTrainerByUsername_ShouldReturnEmpty_WhenUsernameIsNullOrEmpty() {
+        Optional<Trainer> found1 = trainerService.findTrainerByUsername(null);
+        Optional<Trainer> found2 = trainerService.findTrainerByUsername("");
+        Optional<Trainer> found3 = trainerService.findTrainerByUsername("  ");
+
+        assertThat(found1).isEmpty();
+        assertThat(found2).isEmpty();
+        assertThat(found3).isEmpty();
+        verify(trainerDao, never()).findByUsername(any());
+    }
+
+    @Test
+    void findAllTrainers_ShouldReturnAllTrainers() {
+        List<Trainer> trainers = Arrays.asList(testTrainer, new Trainer("Jane", "Coach", testSpecialization));
+        when(trainerDao.findAll()).thenReturn(trainers);
+
+        List<Trainer> found = trainerService.findAllTrainers();
+
+        assertThat(found).hasSize(2);
+        assertThat(found).isEqualTo(trainers);
+    }
+
+    @Test
+    void findTrainersBySpecialization_ShouldReturnMatchingTrainers() {
+        Trainer cardioTrainer1 = new Trainer("Trainer1", "One", testSpecialization);
+        Trainer cardioTrainer2 = new Trainer("Trainer2", "Two", testSpecialization);
+
+        TrainingType strengthType = new TrainingType("Strength");
+        strengthType.setId(2L);
+        Trainer strengthTrainer = new Trainer("Trainer3", "Three", strengthType);
+
+        when(trainerDao.findAll()).thenReturn(Arrays.asList(cardioTrainer1, cardioTrainer2, strengthTrainer));
+
+        List<Trainer> found = trainerService.findTrainersBySpecialization(testSpecialization);
+
+        assertThat(found).hasSize(2);
+        assertThat(found).contains(cardioTrainer1, cardioTrainer2);
+        assertThat(found).doesNotContain(strengthTrainer);
+    }
+
+    @Test
+    void findTrainersBySpecialization_ShouldReturnEmpty_WhenSpecializationIsNull() {
+        List<Trainer> found = trainerService.findTrainersBySpecialization(null);
+
+        assertThat(found).isEmpty();
+        verify(trainerDao, never()).findAll();
+    }
+
+    @Test
+    void findTrainersBySpecialization_ShouldFilterOutNullSpecializations() {
+        Trainer trainerWithSpec = new Trainer("With", "Spec", testSpecialization);
+        Trainer trainerWithoutSpec = new Trainer("Without", "Spec", null);
+
+        when(trainerDao.findAll()).thenReturn(Arrays.asList(trainerWithSpec, trainerWithoutSpec));
+
+        List<Trainer> found = trainerService.findTrainersBySpecialization(testSpecialization);
+
+        assertThat(found).hasSize(1);
+        assertThat(found).contains(trainerWithSpec);
+    }
+
+    @Test
+    void trainerExists_ShouldReturnTrue_WhenExists() {
+        when(trainerDao.existsById(1L)).thenReturn(true);
+
+        boolean exists = trainerService.trainerExists(1L);
+
+        assertThat(exists).isTrue();
+    }
+
+    @Test
+    void trainerExists_ShouldReturnFalse_WhenNotExists() {
+        when(trainerDao.existsById(999L)).thenReturn(false);
+
+        boolean exists = trainerService.trainerExists(999L);
+
+        assertThat(exists).isFalse();
+    }
+
+    @Test
+    void trainerExists_ShouldReturnFalse_WhenIdIsNull() {
+        boolean exists = trainerService.trainerExists(null);
+
+        assertThat(exists).isFalse();
+    }
+
+    @Test
+    void changePassword_ShouldUpdatePassword() {
+        ChangeLoginRequest request = new ChangeLoginRequest();
+        request.setUsername("john.trainer");
+        request.setOldPassword("oldPassword");
+        request.setNewPassword("newPassword");
+
+        when(passwordEncryption.matches("oldPassword", "encodedPassword")).thenReturn(true);
+        when(passwordEncryption.encode("newPassword")).thenReturn("newEncodedPassword");
+        when(trainerDao.update(any(Trainer.class))).thenReturn(testTrainer);
+
+        trainerService.changePassword(testTrainer, request);
+
+        verify(passwordEncryption).matches("oldPassword", "encodedPassword");
+        verify(passwordEncryption).encode("newPassword");
+        verify(trainerDao).update(argThat(t -> t.getPassword().equals("newEncodedPassword")));
+    }
+
+    @Test
+    void changePassword_ShouldThrowException_WhenOldPasswordInvalid() {
+        ChangeLoginRequest request = new ChangeLoginRequest();
+        request.setOldPassword("wrongPassword");
+        request.setNewPassword("newPassword");
+
+        when(passwordEncryption.matches("wrongPassword", "encodedPassword")).thenReturn(false);
+
+        assertThatThrownBy(() -> trainerService.changePassword(testTrainer, request))
+                .isInstanceOf(InvalidCredentialsException.class)
+                .hasMessage("Invalid old password");
+    }
+
+    @Test
+    void activateTrainer_ShouldHandleUpdateException() {
+        when(trainerDao.findById(1L)).thenReturn(Optional.of(testTrainer));
+        when(trainerDao.update(any(Trainer.class))).thenThrow(new RuntimeException("DB error"));
+
+        boolean result = trainerService.activateTrainer("JWT_AUTH", "JWT_AUTH", 1L);
+
+        assertThat(result).isFalse();
+    }
+
+    @Test
+    void deactivateTrainer_ShouldHandleUpdateException() {
+        when(trainerDao.findById(1L)).thenReturn(Optional.of(testTrainer));
+        when(trainerDao.update(any(Trainer.class))).thenThrow(new RuntimeException("DB error"));
+
+        boolean result = trainerService.deactivateTrainer("JWT_AUTH", "JWT_AUTH", 1L);
+
+        assertThat(result).isFalse();
     }
 }

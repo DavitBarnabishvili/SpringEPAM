@@ -5,11 +5,16 @@
         </encoder>
     </appender>
 
-    <logger name="com.gym.crm" level="DEBUG"/>
-    <logger name="org.springframework" level="WARN"/>
-    <logger name="org.mockito" level="WARN"/>
-
     <root level="WARN">
         <appender-ref ref="STDOUT"/>
     </root>
+
+    <logger name="com.gym.crm" level="INFO"/>
+
+    <logger name="org.springframework" level="WARN"/>
+    <logger name="org.hibernate" level="WARN"/>
+    <logger name="org.hibernate.SQL" level="OFF"/>
+    <logger name="org.hibernate.type.descriptor.sql" level="OFF"/>
+
+    <logger name="org.h2" level="WARN"/>
 </configuration>

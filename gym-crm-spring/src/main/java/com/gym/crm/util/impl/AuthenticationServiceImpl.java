@@ -4,6 +4,9 @@ import com.gym.crm.dao.TraineeDao;
 import com.gym.crm.dao.TrainerDao;
 import com.gym.crm.entity.Trainee;
 import com.gym.crm.entity.Trainer;
+import com.gym.crm.exception.InactiveAccountException;
+import com.gym.crm.exception.InvalidCredentialsException;
+import com.gym.crm.exception.UnauthorizedAccessException;
 import com.gym.crm.util.AuthenticationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,22 +21,25 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
     private final TraineeDao traineeDao;
     private final TrainerDao trainerDao;
+    private final PasswordEncryption passwordEncryption;
 
-    public AuthenticationServiceImpl(TraineeDao traineeDao, TrainerDao trainerDao) {
+    public AuthenticationServiceImpl(TraineeDao traineeDao, TrainerDao trainerDao,
+                                     PasswordEncryption passwordEncryption) {
         this.traineeDao = traineeDao;
         this.trainerDao = trainerDao;
+        this.passwordEncryption = passwordEncryption;
     }
 
     @Override
     public Trainee authenticateTrainee(String username, String password) {
         if (username == null || username.trim().isEmpty()) {
             logger.warn("Trainee authentication failed: username is null or empty");
-            throw new SecurityException("Username is required");
+            throw new InvalidCredentialsException("Username is required");
         }
 
         if (password == null || password.trim().isEmpty()) {
             logger.warn("Trainee authentication failed: password is null or empty for username: {}", username);
-            throw new SecurityException("Password is required");
+            throw new InvalidCredentialsException("Password is required");
         }
 
         logger.debug("Authenticating trainee with username: {}", username);
@@ -42,19 +48,19 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
         if (traineeOpt.isEmpty()) {
             logger.warn("Trainee authentication failed: username not found: {}", username);
-            throw new SecurityException("Invalid username or password");
+            throw new InvalidCredentialsException("Invalid username or password");
         }
 
         Trainee trainee = traineeOpt.get();
 
-        if (!password.equals(trainee.getPassword())) {
+        if (!passwordEncryption.matches(password, trainee.getPassword())) {
             logger.warn("Trainee authentication failed: invalid password for username: {}", username);
-            throw new SecurityException("Invalid username or password");
+            throw new InvalidCredentialsException("Invalid username or password");
         }
 
         if (!trainee.isActive()) {
             logger.warn("Trainee authentication failed: account is inactive for username: {}", username);
-            throw new SecurityException("Account is inactive");
+            throw new InactiveAccountException("This account is inactive");
         }
 
         logger.info("Trainee authenticated successfully: {}", username);
@@ -65,12 +71,12 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     public Trainer authenticateTrainer(String username, String password) {
         if (username == null || username.trim().isEmpty()) {
             logger.warn("Trainer authentication failed: username is null or empty");
-            throw new SecurityException("Username is required");
+            throw new InvalidCredentialsException("Username is required");
         }
 
         if (password == null || password.trim().isEmpty()) {
             logger.warn("Trainer authentication failed: password is null or empty for username: {}", username);
-            throw new SecurityException("Password is required");
+            throw new InvalidCredentialsException("Password is required");
         }
 
         logger.debug("Authenticating trainer with username: {}", username);
@@ -79,19 +85,19 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
         if (trainerOpt.isEmpty()) {
             logger.warn("Trainer authentication failed: username not found: {}", username);
-            throw new SecurityException("Invalid username or password");
+            throw new InvalidCredentialsException("Invalid username or password");
         }
 
         Trainer trainer = trainerOpt.get();
 
-        if (!password.equals(trainer.getPassword())) {
+        if (!passwordEncryption.matches(password, trainer.getPassword())) {
             logger.warn("Trainer authentication failed: invalid password for username: {}", username);
-            throw new SecurityException("Invalid username or password");
+            throw new InvalidCredentialsException("Invalid username or password");
         }
 
         if (!trainer.isActive()) {
             logger.warn("Trainer authentication failed: account is inactive for username: {}", username);
-            throw new SecurityException("Account is inactive");
+            throw new InactiveAccountException("This account is inactive");
         }
 
         logger.info("Trainer authenticated successfully: {}", username);
@@ -101,12 +107,12 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     @Override
     public void validateTraineeAccess(String authenticatedUsername, Long targetTraineeId) {
         if (authenticatedUsername == null || targetTraineeId == null) {
-            throw new SecurityException("Invalid access validation parameters");
+            throw new UnauthorizedAccessException("Invalid access validation parameters");
         }
 
         Optional<Trainee> targetTraineeOpt = traineeDao.findById(targetTraineeId);
         if (targetTraineeOpt.isEmpty()) {
-            throw new SecurityException("Target trainee not found");
+            throw new UnauthorizedAccessException("Target trainee not found");
         }
 
         Trainee targetTrainee = targetTraineeOpt.get();
@@ -114,7 +120,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         if (!authenticatedUsername.equals(targetTrainee.getUsername())) {
             logger.warn("Access denied: {} attempted to modify trainee: {}",
                     authenticatedUsername, targetTrainee.getUsername());
-            throw new SecurityException("Users can only modify their own profile");
+            throw new UnauthorizedAccessException("Users can only modify their own profile");
         }
 
         logger.debug("Access validated: {} can modify trainee profile", authenticatedUsername);
@@ -123,12 +129,12 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     @Override
     public void validateTrainerAccess(String authenticatedUsername, Long targetTrainerId) {
         if (authenticatedUsername == null || targetTrainerId == null) {
-            throw new SecurityException("Invalid access validation parameters");
+            throw new UnauthorizedAccessException("Invalid access validation parameters");
         }
 
         Optional<Trainer> targetTrainerOpt = trainerDao.findById(targetTrainerId);
         if (targetTrainerOpt.isEmpty()) {
-            throw new SecurityException("Target trainer not found");
+            throw new UnauthorizedAccessException("Target trainer not found");
         }
 
         Trainer targetTrainer = targetTrainerOpt.get();
@@ -136,7 +142,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         if (!authenticatedUsername.equals(targetTrainer.getUsername())) {
             logger.warn("Access denied: {} attempted to modify trainer: {}",
                     authenticatedUsername, targetTrainer.getUsername());
-            throw new SecurityException("Users can only modify their own profile");
+            throw new UnauthorizedAccessException("Users can only modify their own profile");
         }
 
         logger.debug("Access validated: {} can modify trainer profile", authenticatedUsername);
@@ -147,7 +153,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         try {
             authenticateTrainee(username, password);
             return true;
-        } catch (SecurityException e) {
+        } catch (InvalidCredentialsException | InactiveAccountException e) {
             return false;
         }
     }
@@ -157,7 +163,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         try {
             authenticateTrainer(username, password);
             return true;
-        } catch (SecurityException e) {
+        } catch (InvalidCredentialsException | InactiveAccountException e) {
             return false;
         }
     }

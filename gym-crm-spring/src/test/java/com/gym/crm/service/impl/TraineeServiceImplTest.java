@@ -1,322 +1,456 @@
 package com.gym.crm.service.impl;
 
 import com.gym.crm.dao.TraineeDao;
+import com.gym.crm.dao.TrainingDao;
+import com.gym.crm.dto.request.ChangeLoginRequest;
 import com.gym.crm.entity.Trainee;
+import com.gym.crm.entity.User;
+import com.gym.crm.exception.InvalidCredentialsException;
+import com.gym.crm.exception.UserNotFoundException;
+import com.gym.crm.service.TraineeService;
+import com.gym.crm.util.AuthenticationService;
 import com.gym.crm.util.CredentialsGeneratorService;
+import com.gym.crm.util.impl.PasswordEncryption;
 import com.gym.crm.util.ValidationService;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("TraineeServiceImpl Tests")
 class TraineeServiceImplTest {
 
     @Mock
-    private TraineeDao mockTraineeDao;
+    private TraineeDao traineeDao;
 
     @Mock
-    private CredentialsGeneratorService mockCredentialsGenerator;
+    private TrainingDao trainingDao;
 
     @Mock
-    private ValidationService mockValidationService;
+    private AuthenticationService authenticationService;
 
-    private TraineeServiceImpl traineeService;
+    @Mock
+    private CredentialsGeneratorService credentialsGenerator;
+
+    @Mock
+    private ValidationService validationService;
+
+    @Mock
+    private PasswordEncryption passwordEncryption;
+
+    private TraineeService traineeService;
     private Trainee testTrainee;
 
     @BeforeEach
     void setUp() {
-        traineeService = new TraineeServiceImpl(mockTraineeDao, mockCredentialsGenerator, mockValidationService);
-        testTrainee = new Trainee("John", "Doe", LocalDate.of(1990, 1, 1), "123 Main St");
-        testTrainee.setUserId(1L);
+        traineeService = new TraineeServiceImpl(
+                traineeDao,
+                trainingDao,
+                authenticationService,
+                credentialsGenerator,
+                validationService,
+                passwordEncryption
+        );
+
+        testTrainee = new Trainee("John", "Doe", LocalDate.of(1990, 1, 1), "123 Test St");
+        testTrainee.setId(1L);
         testTrainee.setUsername("john.doe");
-        testTrainee.setPassword("password123");
-    }
-
-    @Test
-    @DisplayName("createTrainee should throw exception for null trainee")
-    void createTrainee_WithNullTrainee_ShouldThrowException() {
-        assertThrows(IllegalArgumentException.class, () -> traineeService.createTrainee(null));
-    }
-
-    @Test
-    @DisplayName("createTrainee should validate trainee")
-    void createTrainee_ShouldValidateTrainee() {
-        Trainee newTrainee = new Trainee("Jane", "Smith");
-        when(mockCredentialsGenerator.generateUsername("Jane", "Smith")).thenReturn("jane.smith");
-        when(mockCredentialsGenerator.generatePassword()).thenReturn("password123");
-        when(mockTraineeDao.create(any(Trainee.class))).thenReturn(newTrainee);
-
-        traineeService.createTrainee(newTrainee);
-
-        verify(mockValidationService).validateTrainee(newTrainee);
-    }
-
-    @Test
-    @DisplayName("createTrainee should generate credentials")
-    void createTrainee_ShouldGenerateCredentials() {
-        Trainee newTrainee = new Trainee("Jane", "Smith");
-        when(mockCredentialsGenerator.generateUsername("Jane", "Smith")).thenReturn("jane.smith");
-        when(mockCredentialsGenerator.generatePassword()).thenReturn("password123");
-        when(mockTraineeDao.create(any(Trainee.class))).thenReturn(newTrainee);
-
-        traineeService.createTrainee(newTrainee);
-
-        verify(mockCredentialsGenerator).generateUsername("Jane", "Smith");
-        verify(mockCredentialsGenerator).generatePassword();
-        assertEquals("jane.smith", newTrainee.getUsername());
-        assertEquals("password123", newTrainee.getPassword());
-        assertTrue(newTrainee.getIsActive());
-    }
-
-    @Test
-    @DisplayName("createTrainee should override existing credentials")
-    void createTrainee_WithExistingCredentials_ShouldOverrideCredentials() {
-        Trainee traineeWithCredentials = new Trainee("Jane", "Smith");
-        traineeWithCredentials.setUsername("existing.username");
-        traineeWithCredentials.setPassword("existing.password");
-
-        when(mockCredentialsGenerator.generateUsername("Jane", "Smith")).thenReturn("jane.smith");
-        when(mockCredentialsGenerator.generatePassword()).thenReturn("new.password");
-        when(mockTraineeDao.create(any(Trainee.class))).thenReturn(traineeWithCredentials);
-
-        traineeService.createTrainee(traineeWithCredentials);
-
-        assertEquals("jane.smith", traineeWithCredentials.getUsername());
-        assertEquals("new.password", traineeWithCredentials.getPassword());
-    }
-
-    @Test
-    @DisplayName("createTrainee should save trainee via DAO")
-    void createTrainee_ShouldSaveTraineeViaDao() {
-        Trainee newTrainee = new Trainee("Jane", "Smith");
-        when(mockCredentialsGenerator.generateUsername(anyString(), anyString())).thenReturn("jane.smith");
-        when(mockCredentialsGenerator.generatePassword()).thenReturn("password123");
-        when(mockTraineeDao.create(newTrainee)).thenReturn(newTrainee);
-
-        Trainee result = traineeService.createTrainee(newTrainee);
-
-        verify(mockTraineeDao).create(newTrainee);
-        assertEquals(newTrainee, result);
-    }
-    @Test
-    @DisplayName("updateTrainee should throw exception for null trainee")
-    void updateTrainee_WithNullTrainee_ShouldThrowException() {
-        assertThrows(IllegalArgumentException.class, () -> traineeService.updateTrainee(null));
-    }
-
-    @Test
-    @DisplayName("updateTrainee should throw exception when trainee has no ID")
-    void updateTrainee_WithoutId_ShouldThrowException() {
-        Trainee traineeWithoutId = new Trainee("Jane", "Smith");
-
-        assertThrows(IllegalArgumentException.class, () -> traineeService.updateTrainee(traineeWithoutId));
-    }
-
-    @Test
-    @DisplayName("updateTrainee should throw exception when trainee not found")
-    void updateTrainee_WhenTraineeNotFound_ShouldThrowException() {
-        when(mockTraineeDao.findById(1L)).thenReturn(Optional.empty());
-
-        assertThrows(RuntimeException.class, () -> traineeService.updateTrainee(testTrainee));
-    }
-
-    @Test
-    @DisplayName("updateTrainee should preserve credentials")
-    void updateTrainee_ShouldPreserveCredentials() {
-        Trainee existingTrainee = new Trainee("John", "Doe");
-        existingTrainee.setUserId(1L);
-        existingTrainee.setUsername("john.doe");
-        existingTrainee.setPassword("original.password");
-
-        Trainee updatedTrainee = new Trainee("John", "Smith"); // Changed last name
-        updatedTrainee.setUserId(1L);
-
-        when(mockTraineeDao.findById(1L)).thenReturn(Optional.of(existingTrainee));
-        when(mockTraineeDao.update(updatedTrainee)).thenReturn(updatedTrainee);
-
-        traineeService.updateTrainee(updatedTrainee);
-
-        assertEquals("john.doe", updatedTrainee.getUsername());
-        assertEquals("original.password", updatedTrainee.getPassword());
-        verify(mockTraineeDao).update(updatedTrainee);
-    }
-
-    @Test
-    @DisplayName("deleteTrainee should return false for null ID")
-    void deleteTrainee_WithNullId_ShouldReturnFalse() {
-        assertFalse(traineeService.deleteTrainee(null));
-        verify(mockTraineeDao, never()).delete(any());
-    }
-
-    @Test
-    @DisplayName("deleteTrainee should delegate to DAO")
-    void deleteTrainee_ShouldDelegateToDao() {
-        when(mockTraineeDao.delete(1L)).thenReturn(true);
-
-        boolean result = traineeService.deleteTrainee(1L);
-
-        assertTrue(result);
-        verify(mockTraineeDao).delete(1L);
-    }
-
-    @Test
-    @DisplayName("findTraineeById should return empty for null ID")
-    void findTraineeById_WithNullId_ShouldReturnEmpty() {
-        Optional<Trainee> result = traineeService.findTraineeById(null);
-        assertTrue(result.isEmpty());
-    }
-
-    @Test
-    @DisplayName("findTraineeById should delegate to DAO")
-    void findTraineeById_ShouldDelegateToDao() {
-        when(mockTraineeDao.findById(1L)).thenReturn(Optional.of(testTrainee));
-
-        Optional<Trainee> result = traineeService.findTraineeById(1L);
-
-        assertTrue(result.isPresent());
-        assertEquals(testTrainee, result.get());
-    }
-
-    @Test
-    @DisplayName("findTraineeByUsername should return empty for invalid username")
-    void findTraineeByUsername_WithInvalidUsername_ShouldReturnEmpty() {
-        assertTrue(traineeService.findTraineeByUsername(null).isEmpty());
-        assertTrue(traineeService.findTraineeByUsername("").isEmpty());
-        assertTrue(traineeService.findTraineeByUsername("   ").isEmpty());
-    }
-
-    @Test
-    @DisplayName("findTraineeByUsername should delegate to DAO")
-    void findTraineeByUsername_ShouldDelegateToDao() {
-        when(mockTraineeDao.findByUsername("john.doe")).thenReturn(Optional.of(testTrainee));
-
-        Optional<Trainee> result = traineeService.findTraineeByUsername("john.doe");
-
-        assertTrue(result.isPresent());
-        assertEquals(testTrainee, result.get());
-    }
-
-    @Test
-    @DisplayName("findAllTrainees should delegate to DAO")
-    void findAllTrainees_ShouldDelegateToDao() {
-        List<Trainee> expectedTrainees = List.of(testTrainee);
-        when(mockTraineeDao.findAll()).thenReturn(expectedTrainees);
-
-        List<Trainee> result = traineeService.findAllTrainees();
-
-        assertEquals(expectedTrainees, result);
-    }
-
-    @Test
-    @DisplayName("findAllActiveTrainees should delegate to DAO")
-    void findAllActiveTrainees_ShouldDelegateToDao() {
-        List<Trainee> expectedTrainees = List.of(testTrainee);
-        when(mockTraineeDao.findAllActive()).thenReturn(expectedTrainees);
-
-        List<Trainee> result = traineeService.findAllActiveTrainees();
-
-        assertEquals(expectedTrainees, result);
-    }
-
-    @Test
-    @DisplayName("findTraineesByAgeRange should return empty for invalid range")
-    void findTraineesByAgeRange_WithInvalidRange_ShouldReturnEmpty() {
-        assertTrue(traineeService.findTraineesByAgeRange(-1, 25).isEmpty());
-        assertTrue(traineeService.findTraineesByAgeRange(25, -1).isEmpty());
-        assertTrue(traineeService.findTraineesByAgeRange(30, 25).isEmpty());
-    }
-
-    @Test
-    @DisplayName("findTraineesByAgeRange should filter by age")
-    void findTraineesByAgeRange_ShouldFilterByAge() {
-        Trainee youngTrainee = new Trainee("Young", "Person", LocalDate.now().minusYears(20), "Address");
-        Trainee oldTrainee = new Trainee("Old", "Person", LocalDate.now().minusYears(50), "Address");
-
-        when(mockTraineeDao.findAll()).thenReturn(List.of(youngTrainee, oldTrainee));
-
-        List<Trainee> result = traineeService.findTraineesByAgeRange(18, 30);
-
-        assertEquals(1, result.size());
-        assertEquals(youngTrainee, result.getFirst());
-    }
-
-    @Test
-    @DisplayName("activateTrainee should return false for null ID")
-    void activateTrainee_WithNullId_ShouldReturnFalse() {
-        assertFalse(traineeService.activateTrainee(null));
-    }
-
-    @Test
-    @DisplayName("activateTrainee should return false when trainee not found")
-    void activateTrainee_WhenTraineeNotFound_ShouldReturnFalse() {
-        when(mockTraineeDao.findById(999L)).thenReturn(Optional.empty());
-
-        assertFalse(traineeService.activateTrainee(999L));
-    }
-
-    @Test
-    @DisplayName("activateTrainee should activate trainee")
-    void activateTrainee_ShouldActivateTrainee() {
-        testTrainee.setIsActive(false);
-        when(mockTraineeDao.findById(1L)).thenReturn(Optional.of(testTrainee));
-        when(mockTraineeDao.update(testTrainee)).thenReturn(testTrainee);
-
-        boolean result = traineeService.activateTrainee(1L);
-
-        assertTrue(result);
-        assertTrue(testTrainee.getIsActive());
-        verify(mockTraineeDao).update(testTrainee);
-    }
-
-    @Test
-    @DisplayName("deactivateTrainee should deactivate trainee")
-    void deactivateTrainee_ShouldDeactivateTrainee() {
+        testTrainee.setPassword("encodedPassword");
         testTrainee.setIsActive(true);
-        when(mockTraineeDao.findById(1L)).thenReturn(Optional.of(testTrainee));
-        when(mockTraineeDao.update(testTrainee)).thenReturn(testTrainee);
-
-        boolean result = traineeService.deactivateTrainee(1L);
-
-        assertTrue(result);
-        assertFalse(testTrainee.getIsActive());
-        verify(mockTraineeDao).update(testTrainee);
     }
 
     @Test
-    @DisplayName("activateTrainee should handle update exceptions")
-    void activateTrainee_WithUpdateException_ShouldReturnFalse() {
-        when(mockTraineeDao.findById(1L)).thenReturn(Optional.of(testTrainee));
-        when(mockTraineeDao.update(testTrainee)).thenThrow(new RuntimeException("Update failed"));
+    void createTrainee_ShouldGenerateCredentialsAndPersist() {
+        Trainee inputTrainee = new Trainee("John", "Doe");
 
-        boolean result = traineeService.activateTrainee(1L);
+        when(credentialsGenerator.generateUsername("John", "Doe")).thenReturn("john.doe");
+        when(credentialsGenerator.generatePassword()).thenReturn("rawPassword123");
+        when(passwordEncryption.encode("rawPassword123")).thenReturn("encodedPassword");
+        when(traineeDao.create(any(Trainee.class))).thenAnswer(invocation -> {
+            Trainee t = invocation.getArgument(0);
+            t.setId(1L);
+            return t;
+        });
 
-        assertFalse(result);
+        Trainee created = traineeService.createTrainee(inputTrainee);
+
+        assertThat(created).isNotNull();
+        assertThat(created.getUsername()).isEqualTo("john.doe");
+        assertThat(created.getPassword()).isEqualTo("rawPassword123");
+        assertThat(created.getIsActive()).isTrue();
+
+        verify(validationService).validateTrainee(any(Trainee.class));
+        verify(traineeDao).create(any(Trainee.class));
     }
 
     @Test
-    @DisplayName("traineeExists should return false for null ID")
-    void traineeExists_WithNullId_ShouldReturnFalse() {
-        assertFalse(traineeService.traineeExists(null));
+    void createTrainee_ShouldThrowException_WhenTraineeIsNull() {
+        assertThatThrownBy(() -> traineeService.createTrainee(null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Trainee cannot be null");
     }
 
     @Test
-    @DisplayName("traineeExists should delegate to DAO")
-    void traineeExists_ShouldDelegateToDao() {
-        when(mockTraineeDao.existsById(1L)).thenReturn(true);
-        assertTrue(traineeService.traineeExists(1L));
-        verify(mockTraineeDao).existsById(1L);
+    void createTrainee_ShouldOverridePresetCredentials() {
+        Trainee inputTrainee = new Trainee("John", "Doe");
+        inputTrainee.setUsername("preset.username");
+        inputTrainee.setPassword("preset.password");
+
+        when(credentialsGenerator.generateUsername("John", "Doe")).thenReturn("john.doe");
+        when(credentialsGenerator.generatePassword()).thenReturn("generatedPassword");
+        when(passwordEncryption.encode("generatedPassword")).thenReturn("encodedPassword");
+        when(traineeDao.create(any(Trainee.class))).thenAnswer(invocation -> {
+            Trainee t = invocation.getArgument(0);
+            t.setId(1L);
+            return t;
+        });
+
+        Trainee created = traineeService.createTrainee(inputTrainee);
+
+        assertThat(created.getUsername()).isEqualTo("john.doe");
+        assertThat(created.getPassword()).isEqualTo("generatedPassword");
+    }
+
+    @Test
+    void updateTrainee_ShouldUpdateExistingTrainee() {
+        when(traineeDao.findById(1L)).thenReturn(Optional.of(testTrainee));
+        when(traineeDao.update(any(Trainee.class))).thenReturn(testTrainee);
+
+        Trainee updatedTrainee = traineeService.updateTrainee("JWT_AUTH", "JWT_AUTH", testTrainee);
+
+        assertThat(updatedTrainee).isNotNull();
+        assertThat(updatedTrainee.getUsername()).isEqualTo("john.doe");
+
+        verify(validationService).validateTrainee(testTrainee);
+        verify(traineeDao).update(testTrainee);
+    }
+
+    @Test
+    void updateTrainee_ShouldAuthenticateWhenNotJWT() {
+        when(authenticationService.authenticateTrainee("john.doe", "password")).thenReturn(testTrainee);
+        when(traineeDao.findById(1L)).thenReturn(Optional.of(testTrainee));
+        when(traineeDao.update(any(Trainee.class))).thenReturn(testTrainee);
+
+        traineeService.updateTrainee("john.doe", "password", testTrainee);
+
+        verify(authenticationService).authenticateTrainee("john.doe", "password");
+        verify(authenticationService).validateTraineeAccess("john.doe", 1L);
+    }
+
+    @Test
+    void updateTrainee_ShouldThrowException_WhenTraineeNotFound() {
+        when(traineeDao.findById(1L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> traineeService.updateTrainee("JWT_AUTH", "JWT_AUTH", testTrainee))
+                .isInstanceOf(UserNotFoundException.class)
+                .hasMessage("Trainee not found with id: 1");
+    }
+
+    @Test
+    void updateTrainee_ShouldThrowException_WhenTraineeIsNull() {
+        assertThatThrownBy(() -> traineeService.updateTrainee("user", "pass", null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Trainee cannot be null");
+    }
+
+    @Test
+    void updateTrainee_ShouldThrowException_WhenIdIsNull() {
+        Trainee traineeWithoutId = new Trainee("John", "Doe");
+
+        assertThatThrownBy(() -> traineeService.updateTrainee("user", "pass", traineeWithoutId))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Trainee id is required for update");
+    }
+
+    @Test
+    void deleteTrainee_ShouldDeleteTraineeAndTrainings() {
+        when(trainingDao.deleteByTraineeId(1L)).thenReturn(5);
+        when(traineeDao.delete(1L)).thenReturn(true);
+
+        boolean result = traineeService.deleteTrainee("JWT_AUTH", "JWT_AUTH", 1L);
+
+        assertThat(result).isTrue();
+        verify(trainingDao).deleteByTraineeId(1L);
+        verify(traineeDao).delete(1L);
+    }
+
+    @Test
+    void deleteTrainee_ShouldAuthenticateWhenNotJWT() {
+        when(authenticationService.authenticateTrainee("john.doe", "password")).thenReturn(testTrainee);
+        when(traineeDao.delete(1L)).thenReturn(true);
+
+        traineeService.deleteTrainee("john.doe", "password", 1L);
+
+        verify(authenticationService).authenticateTrainee("john.doe", "password");
+        verify(authenticationService).validateTraineeAccess("john.doe", 1L);
+    }
+
+    @Test
+    void deleteTrainee_ShouldReturnFalse_WhenIdIsNull() {
+        boolean result = traineeService.deleteTrainee("user", "pass", null);
+
+        assertThat(result).isFalse();
+        verify(traineeDao, never()).delete(any());
+    }
+
+    @Test
+    void deleteTrainee_ShouldReturnFalse_WhenTraineeNotFound() {
+        when(traineeDao.delete(999L)).thenReturn(false);
+
+        boolean result = traineeService.deleteTrainee("JWT_AUTH", "JWT_AUTH", 999L);
+
+        assertThat(result).isFalse();
+    }
+
+    @Test
+    void findTraineeById_ShouldReturnTrainee_WhenExists() {
+        when(traineeDao.findById(1L)).thenReturn(Optional.of(testTrainee));
+
+        Optional<Trainee> found = traineeService.findTraineeById(1L);
+
+        assertThat(found).isPresent();
+        assertThat(found.get().getUsername()).isEqualTo("john.doe");
+    }
+
+    @Test
+    void findTraineeById_ShouldReturnEmpty_WhenNotExists() {
+        when(traineeDao.findById(999L)).thenReturn(Optional.empty());
+
+        Optional<Trainee> found = traineeService.findTraineeById(999L);
+
+        assertThat(found).isEmpty();
+    }
+
+    @Test
+    void findTraineeById_ShouldReturnEmpty_WhenIdIsNull() {
+        Optional<Trainee> found = traineeService.findTraineeById(null);
+
+        assertThat(found).isEmpty();
+        verify(traineeDao, never()).findById(any());
+    }
+
+    @Test
+    void findTraineeByUsername_ShouldReturnTrainee_WhenExists() {
+        when(traineeDao.findByUsername("john.doe")).thenReturn(Optional.of(testTrainee));
+
+        Optional<Trainee> found = traineeService.findTraineeByUsername("john.doe");
+
+        assertThat(found).isPresent();
+        assertThat(found.get().getUsername()).isEqualTo("john.doe");
+    }
+
+    @Test
+    void findTraineeByUsername_ShouldReturnEmpty_WhenNotExists() {
+        when(traineeDao.findByUsername("nonexistent")).thenReturn(Optional.empty());
+
+        Optional<Trainee> found = traineeService.findTraineeByUsername("nonexistent");
+
+        assertThat(found).isEmpty();
+    }
+
+    @Test
+    void findTraineeByUsername_ShouldReturnEmpty_WhenUsernameIsNullOrEmpty() {
+        Optional<Trainee> found1 = traineeService.findTraineeByUsername(null);
+        Optional<Trainee> found2 = traineeService.findTraineeByUsername("");
+        Optional<Trainee> found3 = traineeService.findTraineeByUsername("  ");
+
+        assertThat(found1).isEmpty();
+        assertThat(found2).isEmpty();
+        assertThat(found3).isEmpty();
+        verify(traineeDao, never()).findByUsername(any());
+    }
+
+    @Test
+    void findAllTrainees_ShouldReturnAllTrainees() {
+        List<Trainee> trainees = Arrays.asList(testTrainee, new Trainee("Jane", "Smith"));
+        when(traineeDao.findAll()).thenReturn(trainees);
+
+        List<Trainee> found = traineeService.findAllTrainees();
+
+        assertThat(found).hasSize(2);
+        assertThat(found).isEqualTo(trainees);
+    }
+
+    @Test
+    void findAllActiveTrainees_ShouldReturnActiveTrainees() {
+        List<Trainee> activeTrainees = Collections.singletonList(testTrainee);
+        when(traineeDao.findAllActive()).thenReturn(activeTrainees);
+
+        List<Trainee> found = traineeService.findAllActiveTrainees();
+
+        assertThat(found).hasSize(1);
+        assertThat(found.getFirst().getIsActive()).isTrue();
+    }
+
+    @Test
+    void findTraineesByAgeRange_ShouldReturnTraineesInRange() {
+        LocalDate birthDate25YearsAgo = LocalDate.now().minusYears(25);
+        LocalDate birthDate30YearsAgo = LocalDate.now().minusYears(30);
+
+        Trainee trainee25 = new Trainee("Young", "Person");
+        trainee25.setDateOfBirth(birthDate25YearsAgo);
+
+        Trainee trainee30 = new Trainee("Older", "Person");
+        trainee30.setDateOfBirth(birthDate30YearsAgo);
+
+        Trainee trainee40 = new Trainee("Oldest", "Person");
+        trainee40.setDateOfBirth(LocalDate.now().minusYears(40));
+
+        when(traineeDao.findAll()).thenReturn(Arrays.asList(trainee25, trainee30, trainee40));
+
+        List<Trainee> found = traineeService.findTraineesByAgeRange(24, 31);
+
+        assertThat(found).hasSize(2);
+        assertThat(found).contains(trainee25, trainee30);
+    }
+
+    @Test
+    void findTraineesByAgeRange_ShouldReturnEmpty_WhenInvalidRange() {
+        List<Trainee> found1 = traineeService.findTraineesByAgeRange(-1, 30);
+        List<Trainee> found2 = traineeService.findTraineesByAgeRange(30, 20);
+        List<Trainee> found3 = traineeService.findTraineesByAgeRange(20, -5);
+
+        assertThat(found1).isEmpty();
+        assertThat(found2).isEmpty();
+        assertThat(found3).isEmpty();
+    }
+
+    @Test
+    void activateTrainee_ShouldSetActiveTrue() {
+        when(traineeDao.findById(1L)).thenReturn(Optional.of(testTrainee));
+        when(traineeDao.update(any(Trainee.class))).thenReturn(testTrainee);
+
+        boolean result = traineeService.activateTrainee("JWT_AUTH", "JWT_AUTH", 1L);
+
+        assertThat(result).isTrue();
+        verify(traineeDao).update(argThat(User::getIsActive));
+    }
+
+    @Test
+    void activateTrainee_ShouldAuthenticateWhenNotJWT() {
+        when(authenticationService.authenticateTrainee("john.doe", "password")).thenReturn(testTrainee);
+        when(traineeDao.findById(1L)).thenReturn(Optional.of(testTrainee));
+        when(traineeDao.update(any(Trainee.class))).thenReturn(testTrainee);
+
+        traineeService.activateTrainee("john.doe", "password", 1L);
+
+        verify(authenticationService).authenticateTrainee("john.doe", "password");
+        verify(authenticationService).validateTraineeAccess("john.doe", 1L);
+    }
+
+    @Test
+    void deactivateTrainee_ShouldSetActiveFalse() {
+        when(traineeDao.findById(1L)).thenReturn(Optional.of(testTrainee));
+        when(traineeDao.update(any(Trainee.class))).thenReturn(testTrainee);
+
+        boolean result = traineeService.deactivateTrainee("JWT_AUTH", "JWT_AUTH", 1L);
+
+        assertThat(result).isTrue();
+        verify(traineeDao).update(argThat(t -> !t.getIsActive()));
+    }
+
+    @Test
+    void activateTrainee_ShouldReturnFalse_WhenTraineeNotFound() {
+        when(traineeDao.findById(999L)).thenReturn(Optional.empty());
+
+        boolean result = traineeService.activateTrainee("JWT_AUTH", "JWT_AUTH", 999L);
+
+        assertThat(result).isFalse();
+    }
+
+    @Test
+    void activateTrainee_ShouldReturnFalse_WhenIdIsNull() {
+        boolean result = traineeService.activateTrainee("JWT_AUTH", "JWT_AUTH", null);
+
+        assertThat(result).isFalse();
+        verify(traineeDao, never()).findById(any());
+    }
+
+    @Test
+    void traineeExists_ShouldReturnTrue_WhenExists() {
+        when(traineeDao.existsById(1L)).thenReturn(true);
+
+        boolean exists = traineeService.traineeExists(1L);
+
+        assertThat(exists).isTrue();
+    }
+
+    @Test
+    void traineeExists_ShouldReturnFalse_WhenNotExists() {
+        when(traineeDao.existsById(999L)).thenReturn(false);
+
+        boolean exists = traineeService.traineeExists(999L);
+
+        assertThat(exists).isFalse();
+    }
+
+    @Test
+    void traineeExists_ShouldReturnFalse_WhenIdIsNull() {
+        boolean exists = traineeService.traineeExists(null);
+
+        assertThat(exists).isFalse();
+    }
+
+    @Test
+    void changePassword_ShouldUpdatePassword() {
+        ChangeLoginRequest request = new ChangeLoginRequest();
+        request.setUsername("john.doe");
+        request.setOldPassword("oldPassword");
+        request.setNewPassword("newPassword");
+
+        when(passwordEncryption.matches("oldPassword", "encodedPassword")).thenReturn(true);
+        when(passwordEncryption.encode("newPassword")).thenReturn("newEncodedPassword");
+        when(traineeDao.update(any(Trainee.class))).thenReturn(testTrainee);
+
+        traineeService.changePassword(testTrainee, request);
+
+        verify(passwordEncryption).matches("oldPassword", "encodedPassword");
+        verify(passwordEncryption).encode("newPassword");
+        verify(traineeDao).update(argThat(t -> t.getPassword().equals("newEncodedPassword")));
+    }
+
+    @Test
+    void changePassword_ShouldThrowException_WhenOldPasswordInvalid() {
+        ChangeLoginRequest request = new ChangeLoginRequest();
+        request.setOldPassword("wrongPassword");
+        request.setNewPassword("newPassword");
+
+        when(passwordEncryption.matches("wrongPassword", "encodedPassword")).thenReturn(false);
+
+        assertThatThrownBy(() -> traineeService.changePassword(testTrainee, request))
+                .isInstanceOf(InvalidCredentialsException.class)
+                .hasMessage("Invalid old password");
+    }
+
+    @Test
+    void activateTrainee_ShouldHandleUpdateException() {
+        when(traineeDao.findById(1L)).thenReturn(Optional.of(testTrainee));
+        when(traineeDao.update(any(Trainee.class))).thenThrow(new RuntimeException("DB error"));
+
+        boolean result = traineeService.activateTrainee("JWT_AUTH", "JWT_AUTH", 1L);
+
+        assertThat(result).isFalse();
+    }
+
+    @Test
+    void deactivateTrainee_ShouldHandleUpdateException() {
+        when(traineeDao.findById(1L)).thenReturn(Optional.of(testTrainee));
+        when(traineeDao.update(any(Trainee.class))).thenThrow(new RuntimeException("DB error"));
+
+        boolean result = traineeService.deactivateTrainee("JWT_AUTH", "JWT_AUTH", 1L);
+
+        assertThat(result).isFalse();
     }
 }

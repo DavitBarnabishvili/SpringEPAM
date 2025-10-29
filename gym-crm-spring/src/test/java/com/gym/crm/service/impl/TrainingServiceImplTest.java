@@ -1,228 +1,374 @@
 package com.gym.crm.service.impl;
 
 import com.gym.crm.dao.TraineeDao;
+import com.gym.crm.dao.TrainerDao;
+import com.gym.crm.dao.TrainingDao;
 import com.gym.crm.entity.Trainee;
+import com.gym.crm.entity.Trainer;
 import com.gym.crm.entity.Training;
+import com.gym.crm.entity.TrainingType;
+import com.gym.crm.exception.UnauthorizedAccessException;
+import com.gym.crm.service.TrainingService;
 import com.gym.crm.util.ValidationService;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("TrainingServiceImpl Tests")
 class TrainingServiceImplTest {
 
     @Mock
-    private com.gym.crm.dao.TrainingDao mockTrainingDao;
+    private TrainingDao trainingDao;
 
     @Mock
-    private com.gym.crm.dao.TrainerDao mockTrainerDao;
+    private TrainerDao trainerDao;
 
     @Mock
-    private TraineeDao mockTraineeDao;
+    private TraineeDao traineeDao;
 
     @Mock
-    private ValidationService mockValidationService;
+    private ValidationService validationService;
 
-    private TrainingServiceImpl trainingService;
-    private com.gym.crm.entity.Training testTraining;
+    private TrainingService trainingService;
+    private Training testTraining;
+    private Trainee testTrainee;
+    private Trainer testTrainer;
+    private TrainingType testTrainingType;
 
     @BeforeEach
     void setUp() {
-        trainingService = new TrainingServiceImpl(mockTrainingDao, mockTrainerDao, mockTraineeDao, mockValidationService);
-        com.gym.crm.entity.TrainingType type = new com.gym.crm.entity.TrainingType("Cardio");
-        testTraining = new com.gym.crm.entity.Training(1L, 2L, "Morning Run", type, LocalDate.now(), 60);
+        trainingService = new TrainingServiceImpl(
+                trainingDao,
+                trainerDao,
+                traineeDao,
+                validationService
+        );
+
+        testTrainee = new Trainee("John", "Doe", LocalDate.of(1990, 1, 1), "123 Test St");
+        testTrainee.setId(1L);
+        testTrainee.setUsername("john.doe");
+        testTrainee.setPassword("password");
+        testTrainee.setIsActive(true);
+
+        testTrainingType = new TrainingType("Cardio");
+        testTrainingType.setId(1L);
+
+        testTrainer = new Trainer("Jane", "Smith", testTrainingType);
+        testTrainer.setId(2L);
+        testTrainer.setUsername("jane.smith");
+        testTrainer.setPassword("password");
+        testTrainer.setIsActive(true);
+
+        testTraining = new Training(
+                testTrainee.getId(),
+                testTrainer.getId(),
+                "Morning Workout",
+                testTrainingType,
+                LocalDate.now(),
+                60
+        );
         testTraining.setId(1L);
     }
 
     @Test
-    @DisplayName("createTraining should throw exception for null training")
-    void createTraining_WithNullTraining_ShouldThrowException() {
-        assertThrows(IllegalArgumentException.class, () -> trainingService.createTraining(null));
+    void createTraining_ShouldPersistTraining_WhenUserIsTrainee() {
+        when(traineeDao.existsById(testTrainee.getId())).thenReturn(true);
+        when(trainerDao.existsById(testTrainer.getId())).thenReturn(true);
+        when(traineeDao.findById(testTrainee.getId())).thenReturn(Optional.of(testTrainee));
+        when(trainerDao.findById(testTrainer.getId())).thenReturn(Optional.of(testTrainer));
+        when(trainingDao.create(any(Training.class))).thenReturn(testTraining);
+
+        Training created = trainingService.createTraining("john.doe", testTraining);
+
+        assertThat(created).isNotNull();
+        assertThat(created.getTrainingName()).isEqualTo("Morning Workout");
+        verify(validationService).validateTraining(testTraining);
+        verify(trainingDao).create(testTraining);
     }
 
     @Test
-    @DisplayName("createTraining should validate training")
-    void createTraining_ShouldValidateTraining() {
-        when(mockTraineeDao.existsById(1L)).thenReturn(true);
-        when(mockTrainerDao.existsById(2L)).thenReturn(true);
+    void createTraining_ShouldPersistTraining_WhenUserIsTrainer() {
+        when(traineeDao.existsById(testTrainee.getId())).thenReturn(true);
+        when(trainerDao.existsById(testTrainer.getId())).thenReturn(true);
+        when(traineeDao.findById(testTrainee.getId())).thenReturn(Optional.of(testTrainee));
+        when(trainerDao.findById(testTrainer.getId())).thenReturn(Optional.of(testTrainer));
+        when(trainingDao.create(any(Training.class))).thenReturn(testTraining);
 
-        Trainee activeTrainee = new Trainee("John", "Doe");
-        activeTrainee.setIsActive(true);
-        when(mockTraineeDao.findById(1L)).thenReturn(Optional.of(activeTrainee));
+        Training created = trainingService.createTraining("jane.smith", testTraining);
 
-        com.gym.crm.entity.Trainer activeTrainer = new com.gym.crm.entity.Trainer("Jane", "Smith");
-        activeTrainer.setIsActive(true);
-        when(mockTrainerDao.findById(2L)).thenReturn(Optional.of(activeTrainer));
-
-        when(mockTrainingDao.create(testTraining)).thenReturn(testTraining);
-
-        trainingService.createTraining(testTraining);
-
-        verify(mockValidationService).validateTraining(testTraining);
+        assertThat(created).isNotNull();
+        verify(trainingDao).create(testTraining);
     }
 
     @Test
-    @DisplayName("createTraining should throw exception when trainee not found")
-    void createTraining_WhenTraineeNotFound_ShouldThrowException() {
-        when(mockTraineeDao.existsById(1L)).thenReturn(false);
-
-        assertThrows(RuntimeException.class, () -> trainingService.createTraining(testTraining));
+    void createTraining_ShouldThrowException_WhenTrainingIsNull() {
+        assertThatThrownBy(() -> trainingService.createTraining("john.doe", null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Training cannot be null");
     }
 
     @Test
-    @DisplayName("createTraining should throw exception when trainer not found")
-    void createTraining_WhenTrainerNotFound_ShouldThrowException() {
-        when(mockTraineeDao.existsById(1L)).thenReturn(true);
-        when(mockTrainerDao.existsById(2L)).thenReturn(false);
+    void createTraining_ShouldThrowException_WhenTraineeInactive() {
+        testTrainee.setIsActive(false);
+        when(traineeDao.existsById(testTrainee.getId())).thenReturn(true);
+        when(trainerDao.existsById(testTrainer.getId())).thenReturn(true);
+        when(traineeDao.findById(testTrainee.getId())).thenReturn(Optional.of(testTrainee));
 
-        assertThrows(RuntimeException.class, () -> trainingService.createTraining(testTraining));
+        assertThatThrownBy(() -> trainingService.createTraining("john.doe", testTraining))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Cannot create training for inactive trainee");
     }
 
     @Test
-    @DisplayName("createTraining should throw exception for inactive trainee")
-    void createTraining_WithInactiveTrainee_ShouldThrowException() {
-        when(mockTraineeDao.existsById(1L)).thenReturn(true);
-        when(mockTrainerDao.existsById(2L)).thenReturn(true);
+    void createTraining_ShouldThrowException_WhenTrainerInactive() {
+        testTrainer.setIsActive(false);
+        when(traineeDao.existsById(testTrainee.getId())).thenReturn(true);
+        when(trainerDao.existsById(testTrainer.getId())).thenReturn(true);
+        when(traineeDao.findById(testTrainee.getId())).thenReturn(Optional.of(testTrainee));
+        when(trainerDao.findById(testTrainer.getId())).thenReturn(Optional.of(testTrainer));
 
-        Trainee inactiveTrainee = new Trainee("John", "Doe");
-        inactiveTrainee.setIsActive(false);
-        when(mockTraineeDao.findById(1L)).thenReturn(Optional.of(inactiveTrainee));
-
-        assertThrows(IllegalArgumentException.class, () -> trainingService.createTraining(testTraining));
+        assertThatThrownBy(() -> trainingService.createTraining("john.doe", testTraining))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Cannot create training for inactive trainer");
     }
 
     @Test
-    @DisplayName("createTraining should throw exception for inactive trainer")
-    void createTraining_WithInactiveTrainer_ShouldThrowException() {
-        when(mockTraineeDao.existsById(1L)).thenReturn(true);
-        when(mockTrainerDao.existsById(2L)).thenReturn(true);
+    void findTrainingById_ShouldReturnTraining_WhenExists() {
+        when(trainingDao.findById(1L)).thenReturn(Optional.of(testTraining));
 
-        Trainee activeTrainee = new Trainee("John", "Doe");
-        activeTrainee.setIsActive(true);
-        when(mockTraineeDao.findById(1L)).thenReturn(Optional.of(activeTrainee));
+        Optional<Training> found = trainingService.findTrainingById(1L);
 
-        com.gym.crm.entity.Trainer inactiveTrainer = new com.gym.crm.entity.Trainer("Jane", "Smith");
-        inactiveTrainer.setIsActive(false);
-        when(mockTrainerDao.findById(2L)).thenReturn(Optional.of(inactiveTrainer));
-
-        assertThrows(IllegalArgumentException.class, () -> trainingService.createTraining(testTraining));
+        assertThat(found).isPresent();
+        assertThat(found.get().getTrainingName()).isEqualTo("Morning Workout");
     }
 
     @Test
-    @DisplayName("createTraining should save training via DAO")
-    void createTraining_ShouldSaveTrainingViaDao() {
-        when(mockTraineeDao.existsById(1L)).thenReturn(true);
-        when(mockTrainerDao.existsById(2L)).thenReturn(true);
+    void findTrainingById_ShouldReturnEmpty_WhenNotExists() {
+        when(trainingDao.findById(999L)).thenReturn(Optional.empty());
 
-        Trainee activeTrainee = new Trainee("John", "Doe");
-        activeTrainee.setIsActive(true);
-        when(mockTraineeDao.findById(1L)).thenReturn(Optional.of(activeTrainee));
+        Optional<Training> found = trainingService.findTrainingById(999L);
 
-        com.gym.crm.entity.Trainer activeTrainer = new com.gym.crm.entity.Trainer("Jane", "Smith");
-        activeTrainer.setIsActive(true);
-        when(mockTrainerDao.findById(2L)).thenReturn(Optional.of(activeTrainer));
-
-        when(mockTrainingDao.create(testTraining)).thenReturn(testTraining);
-
-        com.gym.crm.entity.Training result = trainingService.createTraining(testTraining);
-
-        verify(mockTrainingDao).create(testTraining);
-        assertEquals(testTraining, result);
+        assertThat(found).isEmpty();
     }
 
     @Test
-    @DisplayName("findTrainingById should return empty for null ID")
-    void findTrainingById_WithNullId_ShouldReturnEmpty() {
-        Optional<com.gym.crm.entity.Training> result = trainingService.findTrainingById(null);
-        assertTrue(result.isEmpty());
+    void findTrainingById_ShouldReturnEmpty_WhenIdIsNull() {
+        Optional<Training> found = trainingService.findTrainingById(null);
+
+        assertThat(found).isEmpty();
+        verify(trainingDao, never()).findById(any());
     }
 
     @Test
-    @DisplayName("findTrainingById should delegate to DAO")
-    void findTrainingById_ShouldDelegateToDao() {
-        when(mockTrainingDao.findById(1L)).thenReturn(Optional.of(testTraining));
+    void findAllTrainings_ShouldReturnAllTrainings() {
+        List<Training> trainings = Arrays.asList(testTraining, new Training());
+        when(trainingDao.findAll()).thenReturn(trainings);
 
-        Optional<com.gym.crm.entity.Training> result = trainingService.findTrainingById(1L);
+        List<Training> found = trainingService.findAllTrainings();
 
-        assertTrue(result.isPresent());
-        assertEquals(testTraining, result.get());
+        assertThat(found).hasSize(2);
+        assertThat(found).isEqualTo(trainings);
     }
 
     @Test
-    @DisplayName("findAllTrainings should delegate to DAO")
-    void findAllTrainings_ShouldDelegateToDao() {
-        List<Training> expectedTrainings = List.of(testTraining);
-        when(mockTrainingDao.findAll()).thenReturn(expectedTrainings);
+    void findTrainingsByTraineeId_ShouldReturnTrainings_WhenAuthorized() {
+        when(traineeDao.findById(testTrainee.getId())).thenReturn(Optional.of(testTrainee));
+        when(trainingDao.findByTraineeId(testTrainee.getId())).thenReturn(Arrays.asList(testTraining));
 
-        List<com.gym.crm.entity.Training> result = trainingService.findAllTrainings();
+        List<Training> found = trainingService.findTrainingsByTraineeId("john.doe", testTrainee.getId());
 
-        assertEquals(expectedTrainings, result);
+        assertThat(found).hasSize(1);
+        assertThat(found.get(0)).isEqualTo(testTraining);
     }
 
     @Test
-    @DisplayName("findTrainingsByTraineeId should delegate to DAO")
-    void findTrainingsByTraineeId_ShouldDelegateToDao() {
-        List<com.gym.crm.entity.Training> expectedTrainings = List.of(testTraining);
-        when(mockTrainingDao.findByTraineeId(1L)).thenReturn(expectedTrainings);
+    void findTrainingsByTraineeId_ShouldThrowException_WhenUnauthorized() {
+        Trainee otherTrainee = new Trainee("Other", "User");
+        otherTrainee.setId(99L);
+        otherTrainee.setUsername("other.user");
 
-        List<com.gym.crm.entity.Training> result = trainingService.findTrainingsByTraineeId(1L);
+        when(traineeDao.findById(otherTrainee.getId())).thenReturn(Optional.of(otherTrainee));
 
-        assertEquals(expectedTrainings, result);
+        assertThatThrownBy(() -> trainingService.findTrainingsByTraineeId("john.doe", otherTrainee.getId()))
+                .isInstanceOf(UnauthorizedAccessException.class)
+                .hasMessage("Users can only access their own data");
     }
 
     @Test
-    @DisplayName("findTrainingsByTrainerId should delegate to DAO")
-    void findTrainingsByTrainerId_ShouldDelegateToDao() {
-        List<com.gym.crm.entity.Training> expectedTrainings = List.of(testTraining);
-        when(mockTrainingDao.findByTrainerId(2L)).thenReturn(expectedTrainings);
+    void findTrainingsByTraineeId_ShouldReturnEmpty_WhenIdIsNull() {
+        List<Training> found = trainingService.findTrainingsByTraineeId("john.doe", null);
 
-        List<com.gym.crm.entity.Training> result = trainingService.findTrainingsByTrainerId(2L);
-
-        assertEquals(expectedTrainings, result);
+        assertThat(found).isEmpty();
+        verify(trainingDao, never()).findByTraineeId(any());
     }
 
     @Test
-    @DisplayName("findTrainingsByDate should delegate to DAO")
-    void findTrainingsByDate_ShouldDelegateToDao() {
+    void findTrainingsByTrainerId_ShouldReturnTrainings_WhenAuthorized() {
+        when(trainerDao.findById(testTrainer.getId())).thenReturn(Optional.of(testTrainer));
+        when(trainingDao.findByTrainerId(testTrainer.getId())).thenReturn(Arrays.asList(testTraining));
+
+        List<Training> found = trainingService.findTrainingsByTrainerId("jane.smith", testTrainer.getId());
+
+        assertThat(found).hasSize(1);
+        assertThat(found.get(0)).isEqualTo(testTraining);
+    }
+
+    @Test
+    void findTrainingsByTrainerId_ShouldThrowException_WhenUnauthorized() {
+        Trainer otherTrainer = new Trainer("Other", "Trainer", testTrainingType);
+        otherTrainer.setId(99L);
+        otherTrainer.setUsername("other.trainer");
+
+        when(trainerDao.findById(otherTrainer.getId())).thenReturn(Optional.of(otherTrainer));
+
+        assertThatThrownBy(() -> trainingService.findTrainingsByTrainerId("jane.smith", otherTrainer.getId()))
+                .isInstanceOf(UnauthorizedAccessException.class)
+                .hasMessage("Users can only access their own data");
+    }
+
+    @Test
+    void findTrainingsByTrainerId_ShouldReturnEmpty_WhenIdIsNull() {
+        List<Training> found = trainingService.findTrainingsByTrainerId("jane.smith", null);
+
+        assertThat(found).isEmpty();
+        verify(trainingDao, never()).findByTrainerId(any());
+    }
+
+    @Test
+    void findTrainingsByDate_ShouldReturnTrainings() {
         LocalDate date = LocalDate.now();
-        List<com.gym.crm.entity.Training> expectedTrainings = List.of(testTraining);
-        when(mockTrainingDao.findByDate(date)).thenReturn(expectedTrainings);
+        when(trainingDao.findByDate(date)).thenReturn(Arrays.asList(testTraining));
 
-        List<com.gym.crm.entity.Training> result = trainingService.findTrainingsByDate(date);
+        List<Training> found = trainingService.findTrainingsByDate(date);
 
-        assertEquals(expectedTrainings, result);
+        assertThat(found).hasSize(1);
+        assertThat(found.get(0)).isEqualTo(testTraining);
     }
 
     @Test
-    @DisplayName("findTrainingsByDateRange should delegate to DAO")
-    void findTrainingsByDateRange_ShouldDelegateToDao() {
+    void findTrainingsByDate_ShouldReturnEmpty_WhenDateIsNull() {
+        List<Training> found = trainingService.findTrainingsByDate(null);
+
+        assertThat(found).isEmpty();
+        verify(trainingDao, never()).findByDate(any());
+    }
+
+    @Test
+    void findTrainingsByDateRange_ShouldReturnTrainings() {
         LocalDate start = LocalDate.now();
-        LocalDate end = start.plusDays(7);
-        List<com.gym.crm.entity.Training> expectedTrainings = List.of(testTraining);
-        when(mockTrainingDao.findByDateRange(start, end)).thenReturn(expectedTrainings);
+        LocalDate end = LocalDate.now().plusDays(7);
+        when(trainingDao.findByDateRange(start, end)).thenReturn(Arrays.asList(testTraining));
 
-        List<com.gym.crm.entity.Training> result = trainingService.findTrainingsByDateRange(start, end);
+        List<Training> found = trainingService.findTrainingsByDateRange(start, end);
 
-        assertEquals(expectedTrainings, result);
+        assertThat(found).hasSize(1);
+        assertThat(found.get(0)).isEqualTo(testTraining);
     }
 
     @Test
-    @DisplayName("trainingExists should delegate to DAO")
-    void trainingExists_ShouldDelegateToDao() {
-        when(mockTrainingDao.existsById(1L)).thenReturn(true);
-        assertTrue(trainingService.trainingExists(1L));
-        verify(mockTrainingDao).existsById(1L);
+    void findTrainingsByDateRange_ShouldReturnEmpty_WhenNullDates() {
+        List<Training> found1 = trainingService.findTrainingsByDateRange(null, LocalDate.now());
+        List<Training> found2 = trainingService.findTrainingsByDateRange(LocalDate.now(), null);
+
+        assertThat(found1).isEmpty();
+        assertThat(found2).isEmpty();
+        verify(trainingDao, never()).findByDateRange(any(), any());
+    }
+
+    @Test
+    void findTrainingsByDateRange_ShouldReturnEmpty_WhenInvalidRange() {
+        LocalDate end = LocalDate.now();
+        LocalDate start = LocalDate.now().plusDays(1);
+
+        List<Training> found = trainingService.findTrainingsByDateRange(start, end);
+
+        assertThat(found).isEmpty();
+        verify(trainingDao, never()).findByDateRange(any(), any());
+    }
+
+    @Test
+    void findTraineeTrainingsByDateRange_ShouldReturnTrainings_WhenAuthorized() {
+        LocalDate start = LocalDate.now();
+        LocalDate end = LocalDate.now().plusDays(7);
+
+        when(traineeDao.findById(testTrainee.getId())).thenReturn(Optional.of(testTrainee));
+        when(trainingDao.findByTraineeIdAndDateRange(testTrainee.getId(), start, end))
+                .thenReturn(Arrays.asList(testTraining));
+
+        List<Training> found = trainingService.findTraineeTrainingsByDateRange(
+                "john.doe", testTrainee.getId(), start, end);
+
+        assertThat(found).hasSize(1);
+        assertThat(found.get(0)).isEqualTo(testTraining);
+    }
+
+    @Test
+    void findTraineeTrainingsByDateRange_ShouldThrowException_WhenUnauthorized() {
+        LocalDate start = LocalDate.now();
+        LocalDate end = LocalDate.now().plusDays(7);
+
+        Trainee otherTrainee = new Trainee("Other", "User");
+        otherTrainee.setId(99L);
+        otherTrainee.setUsername("other.user");
+
+        when(traineeDao.findById(otherTrainee.getId())).thenReturn(Optional.of(otherTrainee));
+
+        assertThatThrownBy(() -> trainingService.findTraineeTrainingsByDateRange(
+                "john.doe", otherTrainee.getId(), start, end))
+                .isInstanceOf(UnauthorizedAccessException.class)
+                .hasMessage("Users can only access their own data");
+    }
+
+    @Test
+    void findTrainerTrainingsByDateRange_ShouldReturnTrainings_WhenAuthorized() {
+        LocalDate start = LocalDate.now();
+        LocalDate end = LocalDate.now().plusDays(7);
+
+        when(trainerDao.findById(testTrainer.getId())).thenReturn(Optional.of(testTrainer));
+        when(trainingDao.findByTrainerIdAndDateRange(testTrainer.getId(), start, end))
+                .thenReturn(Arrays.asList(testTraining));
+
+        List<Training> found = trainingService.findTrainerTrainingsByDateRange(
+                "jane.smith", testTrainer.getId(), start, end);
+
+        assertThat(found).hasSize(1);
+        assertThat(found.get(0)).isEqualTo(testTraining);
+    }
+
+    @Test
+    void trainingExists_ShouldReturnTrue_WhenExists() {
+        when(trainingDao.existsById(1L)).thenReturn(true);
+
+        boolean exists = trainingService.trainingExists(1L);
+
+        assertThat(exists).isTrue();
+    }
+
+    @Test
+    void trainingExists_ShouldReturnFalse_WhenNotExists() {
+        when(trainingDao.existsById(999L)).thenReturn(false);
+
+        boolean exists = trainingService.trainingExists(999L);
+
+        assertThat(exists).isFalse();
+    }
+
+    @Test
+    void trainingExists_ShouldReturnFalse_WhenIdIsNull() {
+        boolean exists = trainingService.trainingExists(null);
+
+        assertThat(exists).isFalse();
     }
 }

@@ -1,252 +1,252 @@
 package com.gym.crm.dao.impl;
 
+import com.gym.crm.dao.TraineeDao;
 import com.gym.crm.entity.Trainee;
-import com.gym.crm.storage.InMemoryStorage;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@ExtendWith(MockitoExtension.class)
-@DisplayName("TraineeDaoImpl Tests")
+@DataJpaTest
+@Import(TraineeDaoImpl.class)
+@ActiveProfiles("test")
+@Transactional
 class TraineeDaoImplTest {
 
-    @Mock
-    private InMemoryStorage mockStorage;
+    @Autowired
+    private TraineeDao traineeDao;
 
-    private TraineeDaoImpl traineeDao;
     private Trainee testTrainee;
-    private Map<Long, Trainee> mockTraineeMap;
 
     @BeforeEach
     void setUp() {
-        traineeDao = new TraineeDaoImpl(mockStorage);
-        testTrainee = new Trainee("John", "Doe", LocalDate.of(1990, 1, 1), "123 Main St");
-        testTrainee.setUserId(1L);
+        testTrainee = new Trainee(
+                "John",
+                "Doe",
+                LocalDate.of(1990, 1, 1),
+                "123 Test Street"
+        );
         testTrainee.setUsername("john.doe");
         testTrainee.setPassword("password123");
-
-        mockTraineeMap = new ConcurrentHashMap<>();
-    }
-    @Test
-    @DisplayName("create should throw exception for null trainee")
-    void create_WithNullTrainee_ShouldThrowException() {
-        assertThrows(IllegalArgumentException.class, () -> traineeDao.create(null));
+        testTrainee.setIsActive(true);
     }
 
     @Test
-    @DisplayName("create should generate ID when trainee has no ID")
-    void create_WithoutId_ShouldGenerateId() {
-        Trainee traineeWithoutId = new Trainee("Jane", "Smith");
-        when(mockStorage.generateTraineeId()).thenReturn(2L);
-
-        Trainee result = traineeDao.create(traineeWithoutId);
-
-        assertEquals(2L, result.getUserId());
-        verify(mockStorage).generateTraineeId();
-        verify(mockStorage).storeTrainee(2L, traineeWithoutId);
+    void create_ShouldPersistTrainee() {
+        Trainee created = traineeDao.create(testTrainee);
+        assertThat(created).isNotNull();
+        assertThat(created.getId()).isNotNull();
+        assertThat(created.getFirstName()).isEqualTo("John");
+        assertThat(created.getLastName()).isEqualTo("Doe");
+        assertThat(created.getUsername()).isEqualTo("john.doe");
+        assertThat(created.getDateOfBirth()).isEqualTo(LocalDate.of(1990, 1, 1));
+        assertThat(created.getAddress()).isEqualTo("123 Test Street");
     }
 
     @Test
-    @DisplayName("create should use existing ID when trainee has ID")
-    void create_WithExistingId_ShouldUseExistingId() {
-        Trainee result = traineeDao.create(testTrainee);
-
-        assertEquals(1L, result.getUserId());
-        verify(mockStorage, never()).generateTraineeId();
-        verify(mockStorage).storeTrainee(1L, testTrainee);
+    void create_ShouldThrowException_WhenTraineeIsNull() {
+        assertThatThrownBy(() -> traineeDao.create(null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Trainee cannot be null");
     }
 
     @Test
-    @DisplayName("update should throw exception for null trainee")
-    void update_WithNullTrainee_ShouldThrowException() {
-        assertThrows(IllegalArgumentException.class, () -> traineeDao.update(null));
+    void update_ShouldModifyExistingTrainee() {
+        Trainee created = traineeDao.create(testTrainee);
+        created.setFirstName("Jane");
+        created.setAddress("456 New Street");
+
+        Trainee updated = traineeDao.update(created);
+
+        assertThat(updated.getFirstName()).isEqualTo("Jane");
+        assertThat(updated.getAddress()).isEqualTo("456 New Street");
+        assertThat(updated.getId()).isEqualTo(created.getId());
     }
 
     @Test
-    @DisplayName("update should throw exception when trainee has no ID")
-    void update_WithoutId_ShouldThrowException() {
-        Trainee traineeWithoutId = new Trainee("Jane", "Smith");
-
-        assertThrows(IllegalArgumentException.class, () -> traineeDao.update(traineeWithoutId));
+    void update_ShouldThrowException_WhenTraineeIsNull() {
+        assertThatThrownBy(() -> traineeDao.update(null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Trainee cannot be null");
     }
 
     @Test
-    @DisplayName("update should throw exception when trainee not found")
-    void update_WhenTraineeNotFound_ShouldThrowException() {
-        when(mockStorage.getTrainees()).thenReturn(mockTraineeMap);
-        mockTraineeMap.clear();
-        assertThrows(RuntimeException.class, () -> traineeDao.update(testTrainee));
+    void update_ShouldThrowException_WhenTraineeIdIsNull() {
+        Trainee traineeWithoutId = new Trainee("Test", "User");
+
+        assertThatThrownBy(() -> traineeDao.update(traineeWithoutId))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Trainee id cannot be null for update");
     }
 
     @Test
-    @DisplayName("update should update existing trainee")
-    void update_WithExistingTrainee_ShouldUpdate() {
-        when(mockStorage.getTrainees()).thenReturn(mockTraineeMap);
-        mockTraineeMap.put(1L, testTrainee);
-
-        Trainee result = traineeDao.update(testTrainee);
-
-        assertEquals(testTrainee, result);
-        verify(mockStorage).storeTrainee(1L, testTrainee);
+    void delete_ShouldRemoveTrainee() {
+        Trainee created = traineeDao.create(testTrainee);
+        Long id = created.getId();
+        boolean deleted = traineeDao.delete(id);
+        assertThat(deleted).isTrue();
+        assertThat(traineeDao.findById(id)).isEmpty();
     }
 
     @Test
-    @DisplayName("delete should return false for null ID")
-    void delete_WithNullId_ShouldReturnFalse() {
-        assertFalse(traineeDao.delete(null));
+    void delete_ShouldReturnFalse_WhenTraineeNotFound() {
+        boolean deleted = traineeDao.delete(999L);
+        assertThat(deleted).isFalse();
     }
 
     @Test
-    @DisplayName("delete should return false when trainee not found")
-    void delete_WhenTraineeNotFound_ShouldReturnFalse() {
-        when(mockStorage.getTrainee(999L)).thenReturn(null);
-        assertFalse(traineeDao.delete(999L));
+    void delete_ShouldReturnFalse_WhenIdIsNull() {
+        boolean deleted = traineeDao.delete(null);
+        assertThat(deleted).isFalse();
     }
 
     @Test
-    @DisplayName("delete should return true when trainee deleted")
-    void delete_WhenTraineeExists_ShouldReturnTrue() {
-        when(mockStorage.getTrainee(1L)).thenReturn(testTrainee);
-        boolean result = traineeDao.delete(1L);
-        assertTrue(result);
-        verify(mockStorage).removeTrainee(1L);
+    void findById_ShouldReturnTrainee_WhenExists() {
+        Trainee created = traineeDao.create(testTrainee);
+        Optional<Trainee> found = traineeDao.findById(created.getId());
+        assertThat(found).isPresent();
+        assertThat(found.get().getId()).isEqualTo(created.getId());
+        assertThat(found.get().getUsername()).isEqualTo("john.doe");
     }
 
     @Test
-    @DisplayName("findById should return empty for null ID")
-    void findById_WithNullId_ShouldReturnEmpty() {
-        Optional<Trainee> result = traineeDao.findById(null);
-        assertTrue(result.isEmpty());
+    void findById_ShouldReturnEmpty_WhenNotExists() {
+        Optional<Trainee> found = traineeDao.findById(999L);
+        assertThat(found).isEmpty();
     }
 
     @Test
-    @DisplayName("findById should return empty when trainee not found")
-    void findById_WhenTraineeNotFound_ShouldReturnEmpty() {
-        when(mockStorage.getTrainee(999L)).thenReturn(null);
-        Optional<Trainee> result = traineeDao.findById(999L);
-        assertTrue(result.isEmpty());
+    void findById_ShouldReturnEmpty_WhenIdIsNull() {
+        Optional<Trainee> found = traineeDao.findById(null);
+        assertThat(found).isEmpty();
     }
 
     @Test
-    @DisplayName("findById should return trainee when found")
-    void findById_WhenTraineeExists_ShouldReturnTrainee() {
-        when(mockStorage.getTrainee(1L)).thenReturn(testTrainee);
-        Optional<Trainee> result = traineeDao.findById(1L);
-        assertTrue(result.isPresent());
-        assertEquals(testTrainee, result.get());
-    }
-
-    @Test
-    @DisplayName("findAll should return all trainees")
     void findAll_ShouldReturnAllTrainees() {
-        List<Trainee> expectedTrainees = List.of(testTrainee);
-        when(mockStorage.getAllTrainees()).thenReturn(expectedTrainees);
+        traineeDao.create(testTrainee);
 
-        List<Trainee> result = traineeDao.findAll();
+        Trainee trainee2 = new Trainee("Jane", "Smith");
+        trainee2.setUsername("jane.smith");
+        trainee2.setPassword("password456");
+        traineeDao.create(trainee2);
 
-        assertEquals(expectedTrainees, result);
+        List<Trainee> all = traineeDao.findAll();
+
+        assertThat(all).hasSize(2);
+        assertThat(all).extracting(Trainee::getUsername)
+                .containsExactlyInAnyOrder("john.doe", "jane.smith");
     }
 
     @Test
-    @DisplayName("findByUsername should return empty for null username")
-    void findByUsername_WithNullUsername_ShouldReturnEmpty() {
-        Optional<Trainee> result = traineeDao.findByUsername(null);
-        assertTrue(result.isEmpty());
+    void findByUsername_ShouldReturnTrainee_WhenExists() {
+        traineeDao.create(testTrainee);
+        Optional<Trainee> found = traineeDao.findByUsername("john.doe");
+        assertThat(found).isPresent();
+        assertThat(found.get().getUsername()).isEqualTo("john.doe");
+        assertThat(found.get().getFirstName()).isEqualTo("John");
     }
 
     @Test
-    @DisplayName("findByUsername should return empty for empty username")
-    void findByUsername_WithEmptyUsername_ShouldReturnEmpty() {
-        Optional<Trainee> result = traineeDao.findByUsername("");
-        assertTrue(result.isEmpty());
+    void findByUsername_ShouldReturnEmpty_WhenNotExists() {
+        Optional<Trainee> found = traineeDao.findByUsername("nonexistent");
+        assertThat(found).isEmpty();
     }
 
     @Test
-    @DisplayName("findByUsername should find trainee by username")
-    void findByUsername_WhenTraineeExists_ShouldReturnTrainee() {
-        when(mockStorage.getAllTrainees()).thenReturn(List.of(testTrainee));
-
-        Optional<Trainee> result = traineeDao.findByUsername("john.doe");
-
-        assertTrue(result.isPresent());
-        assertEquals(testTrainee, result.get());
+    void findByUsername_ShouldReturnEmpty_WhenUsernameIsNull() {
+        Optional<Trainee> found = traineeDao.findByUsername(null);
+        assertThat(found).isEmpty();
     }
 
     @Test
-    @DisplayName("findByUsername should handle whitespace")
-    void findByUsername_WithWhitespace_ShouldTrimAndFind() {
-        when(mockStorage.getAllTrainees()).thenReturn(List.of(testTrainee));
-
-        Optional<Trainee> result = traineeDao.findByUsername("  john.doe  ");
-
-        assertTrue(result.isPresent());
-        assertEquals(testTrainee, result.get());
+    void findByUsername_ShouldReturnEmpty_WhenUsernameIsEmpty() {
+        Optional<Trainee> found = traineeDao.findByUsername("");
+        assertThat(found).isEmpty();
     }
 
     @Test
-    @DisplayName("findAllActive should return only active trainees")
     void findAllActive_ShouldReturnOnlyActiveTrainees() {
-        Trainee activeTrainee = new Trainee("Active", "User");
-        activeTrainee.setIsActive(true);
-
+        traineeDao.create(testTrainee);
         Trainee inactiveTrainee = new Trainee("Inactive", "User");
+        inactiveTrainee.setUsername("inactive.user");
+        inactiveTrainee.setPassword("password789");
         inactiveTrainee.setIsActive(false);
+        traineeDao.create(inactiveTrainee);
 
-        when(mockStorage.getAllTrainees()).thenReturn(List.of(activeTrainee, inactiveTrainee));
+        List<Trainee> activeTrainees = traineeDao.findAllActive();
 
-        List<Trainee> result = traineeDao.findAllActive();
-
-        assertEquals(1, result.size());
-        assertEquals(activeTrainee, result.getFirst());
+        assertThat(activeTrainees).hasSize(1);
+        assertThat(activeTrainees.getFirst().getUsername()).isEqualTo("john.doe");
+        assertThat(activeTrainees.getFirst().getIsActive()).isTrue();
     }
 
     @Test
-    @DisplayName("existsById should return false for null ID")
-    void existsById_WithNullId_ShouldReturnFalse() {
-        assertFalse(traineeDao.existsById(null));
+    void existsById_ShouldReturnTrue_WhenTraineeExists() {
+        Trainee created = traineeDao.create(testTrainee);
+        boolean exists = traineeDao.existsById(created.getId());
+        assertThat(exists).isTrue();
     }
 
     @Test
-    @DisplayName("existsById should check storage")
-    void existsById_ShouldCheckStorage() {
-        when(mockStorage.getTrainees()).thenReturn(mockTraineeMap);
-        mockTraineeMap.put(1L, testTrainee);
-
-        boolean result = traineeDao.existsById(1L);
-
-        assertTrue(result);
+    void existsById_ShouldReturnFalse_WhenTraineeNotExists() {
+        boolean exists = traineeDao.existsById(999L);
+        assertThat(exists).isFalse();
     }
 
     @Test
-    @DisplayName("existsByUsername should return false for null username")
-    void existsByUsername_WithNullUsername_ShouldReturnFalse() {
-        assertFalse(traineeDao.existsByUsername(null));
+    void existsById_ShouldReturnFalse_WhenIdIsNull() {
+        boolean exists = traineeDao.existsById(null);
+        assertThat(exists).isFalse();
     }
 
     @Test
-    @DisplayName("existsByUsername should return false for empty username")
-    void existsByUsername_WithEmptyUsername_ShouldReturnFalse() {
-        assertFalse(traineeDao.existsByUsername(""));
+    void existsByUsername_ShouldReturnTrue_WhenUsernameExists() {
+        traineeDao.create(testTrainee);
+        boolean exists = traineeDao.existsByUsername("john.doe");
+        assertThat(exists).isTrue();
     }
 
     @Test
-    @DisplayName("existsByUsername should check for username existence")
-    void existsByUsername_ShouldCheckForUsernameExistence() {
-        when(mockStorage.getAllTrainees()).thenReturn(List.of(testTrainee));
+    void existsByUsername_ShouldReturnFalse_WhenUsernameNotExists() {
+        boolean exists = traineeDao.existsByUsername("nonexistent");
+        assertThat(exists).isFalse();
+    }
 
-        assertTrue(traineeDao.existsByUsername("john.doe"));
-        assertFalse(traineeDao.existsByUsername("nonexistent"));
+    @Test
+    void existsByUsername_ShouldReturnFalse_WhenUsernameIsNull() {
+        boolean exists = traineeDao.existsByUsername(null);
+        assertThat(exists).isFalse();
+    }
+
+    @Test
+    void existsByUsername_ShouldReturnFalse_WhenUsernameIsEmpty() {
+        boolean exists = traineeDao.existsByUsername("");
+        assertThat(exists).isFalse();
+    }
+
+    @Test
+    void shouldTrimWhitespaceFromFields() {
+        Trainee traineeWithSpaces = new Trainee(
+                "  John  ",
+                "  Doe  ",
+                LocalDate.of(1990, 1, 1),
+                "  123 Test Street  "
+        );
+        traineeWithSpaces.setUsername("john.doe");
+        traineeWithSpaces.setPassword("password");
+        Trainee created = traineeDao.create(traineeWithSpaces);
+        assertThat(created.getFirstName()).isEqualTo("John");
+        assertThat(created.getLastName()).isEqualTo("Doe");
+        assertThat(created.getAddress()).isEqualTo("123 Test Street");
     }
 }

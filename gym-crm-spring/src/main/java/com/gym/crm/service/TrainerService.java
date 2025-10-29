@@ -1,5 +1,6 @@
 package com.gym.crm.service;
 
+import com.gym.crm.dto.request.ChangeLoginRequest;
 import com.gym.crm.entity.Trainer;
 import com.gym.crm.entity.TrainingType;
 
@@ -71,4 +72,6 @@ public interface TrainerService {
      * @return true if trainer exists, false otherwise
      */
     boolean trainerExists(Long userId);
+
+    void changePassword(Trainer trainer, ChangeLoginRequest request);
 }

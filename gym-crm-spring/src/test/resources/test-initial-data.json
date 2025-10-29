@@ -1,7 +1,0 @@
-{
-  "trainingTypes": [
-    {"id": 1, "trainingTypeName": "Test Cardio"},
-    {"id": 2, "trainingTypeName": "Test Strength"},
-    {"id": 3, "trainingTypeName": "Test Yoga"}
-  ]
-}

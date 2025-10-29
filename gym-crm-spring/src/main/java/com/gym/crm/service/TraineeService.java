@@ -1,5 +1,6 @@
 package com.gym.crm.service;
 
+import com.gym.crm.dto.request.ChangeLoginRequest;
 import com.gym.crm.entity.Trainee;
 
 import java.util.List;
@@ -98,4 +99,6 @@ public interface TraineeService {
      * @return true if trainee exists, false otherwise
      */
     boolean traineeExists(Long userId);
+
+    void changePassword(Trainee trainee, ChangeLoginRequest request);
 }

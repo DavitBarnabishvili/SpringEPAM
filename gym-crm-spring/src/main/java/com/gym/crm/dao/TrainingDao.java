@@ -94,6 +94,5 @@ public interface TrainingDao {
      */
     boolean existsById(Long id);
 
-    // Add method for cascade delete (needed for trainee deletion)
     int deleteByTraineeId(Long traineeId);
 }

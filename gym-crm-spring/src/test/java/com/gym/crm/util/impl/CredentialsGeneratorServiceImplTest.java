@@ -1,203 +1,204 @@
 package com.gym.crm.util.impl;
 
-import com.gym.crm.entity.Trainee;
-import com.gym.crm.entity.Trainer;
-import com.gym.crm.storage.InMemoryStorage;
+import com.gym.crm.dao.TraineeDao;
+import com.gym.crm.dao.TrainerDao;
+import com.gym.crm.util.CredentialsGeneratorService;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.NullAndEmptySource;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("CredentialsGeneratorServiceImpl Tests")
 class CredentialsGeneratorServiceImplTest {
 
     @Mock
-    private InMemoryStorage mockStorage;
+    private TraineeDao traineeDao;
 
-    private CredentialsGeneratorServiceImpl credentialsGenerator;
+    @Mock
+    private TrainerDao trainerDao;
+
+    private CredentialsGeneratorService credentialsGenerator;
 
     @BeforeEach
     void setUp() {
-        credentialsGenerator = new CredentialsGeneratorServiceImpl(mockStorage);
-    }
-
-    @ParameterizedTest
-    @NullAndEmptySource
-    @ValueSource(strings = {"   ", "\t\n"})
-    @DisplayName("generateUsername should throw exception for invalid first name")
-    void generateUsername_WithInvalidFirstName_ShouldThrowException(String firstName) {
-        assertThrows(IllegalArgumentException.class,
-                () -> credentialsGenerator.generateUsername(firstName, "Doe"));
-    }
-
-    @ParameterizedTest
-    @NullAndEmptySource
-    @ValueSource(strings = {"   ", "\t\n"})
-    @DisplayName("generateUsername should throw exception for invalid last name")
-    void generateUsername_WithInvalidLastName_ShouldThrowException(String lastName) {
-        assertThrows(IllegalArgumentException.class,
-                () -> credentialsGenerator.generateUsername("John", lastName));
+        credentialsGenerator = new CredentialsGeneratorServiceImpl(traineeDao, trainerDao);
     }
 
     @Test
-    @DisplayName("generateUsername should create base username when unique")
-    void generateUsername_WhenUnique_ShouldCreateBaseUsername() {
-        when(mockStorage.getAllTrainers()).thenReturn(List.of());
-        when(mockStorage.getAllTrainees()).thenReturn(List.of());
+    void generateUsername_ShouldReturnBaseUsername_WhenUnique() {
+        when(traineeDao.existsByUsername("John.Doe")).thenReturn(false);
+        when(trainerDao.existsByUsername("John.Doe")).thenReturn(false);
 
-        String result = credentialsGenerator.generateUsername("John", "Doe");
+        String username = credentialsGenerator.generateUsername("John", "Doe");
 
-        assertEquals("John.Doe", result);
+        assertThat(username).isEqualTo("John.Doe");
     }
 
     @Test
-    @DisplayName("generateUsername should handle whitespace in names")
-    void generateUsername_WithWhitespace_ShouldTrimNames() {
-        when(mockStorage.getAllTrainers()).thenReturn(List.of());
-        when(mockStorage.getAllTrainees()).thenReturn(List.of());
+    void generateUsername_ShouldAddSerialNumber_WhenDuplicateExists() {
+        when(traineeDao.existsByUsername("John.Doe")).thenReturn(true);
+        when(trainerDao.existsByUsername("John.Doe")).thenReturn(false);
+        when(traineeDao.existsByUsername("John.Doe1")).thenReturn(false);
+        when(trainerDao.existsByUsername("John.Doe1")).thenReturn(false);
 
-        String result = credentialsGenerator.generateUsername("  John  ", "  Doe  ");
+        String username = credentialsGenerator.generateUsername("John", "Doe");
 
-        assertEquals("John.Doe", result);
+        assertThat(username).isEqualTo("John.Doe1");
     }
 
     @Test
-    @DisplayName("generateUsername should add serial number when duplicate exists")
-    void generateUsername_WhenDuplicateExists_ShouldAddSerialNumber() {
-        Trainer existingTrainer = new Trainer("John", "Doe");
-        existingTrainer.setUsername("John.Doe");
+    void generateUsername_ShouldIncrementSerialNumber_WhenMultipleDuplicates() {
+        when(traineeDao.existsByUsername("John.Doe")).thenReturn(true);
+        when(trainerDao.existsByUsername("John.Doe")).thenReturn(false);
+        when(traineeDao.existsByUsername("John.Doe1")).thenReturn(true);
+        when(trainerDao.existsByUsername("John.Doe1")).thenReturn(false);
+        when(traineeDao.existsByUsername("John.Doe2")).thenReturn(false);
+        when(trainerDao.existsByUsername("John.Doe2")).thenReturn(true);
+        when(traineeDao.existsByUsername("John.Doe3")).thenReturn(false);
+        when(trainerDao.existsByUsername("John.Doe3")).thenReturn(false);
 
-        when(mockStorage.getAllTrainers()).thenReturn(List.of(existingTrainer));
-        when(mockStorage.getAllTrainees()).thenReturn(List.of());
+        String username = credentialsGenerator.generateUsername("John", "Doe");
 
-        String result = credentialsGenerator.generateUsername("John", "Doe");
-
-        assertEquals("John.Doe1", result);
+        assertThat(username).isEqualTo("John.Doe3");
     }
 
     @Test
-    @DisplayName("generateUsername should handle multiple duplicates")
-    void generateUsername_WithMultipleDuplicates_ShouldIncrementSerialNumber() {
-        Trainer trainer1 = new Trainer("John", "Doe");
-        trainer1.setUsername("John.Doe");
+    void generateUsername_ShouldTrimNames() {
+        when(traineeDao.existsByUsername("John.Doe")).thenReturn(false);
+        when(trainerDao.existsByUsername("John.Doe")).thenReturn(false);
 
-        Trainer trainer2 = new Trainer("John", "Doe");
-        trainer2.setUsername("John.Doe1");
+        String username = credentialsGenerator.generateUsername("  John  ", "  Doe  ");
 
-        Trainee trainee1 = new Trainee("John", "Doe");
-        trainee1.setUsername("John.Doe2");
-
-        when(mockStorage.getAllTrainers()).thenReturn(List.of(trainer1, trainer2));
-        when(mockStorage.getAllTrainees()).thenReturn(List.of(trainee1));
-
-        String result = credentialsGenerator.generateUsername("John", "Doe");
-
-        assertEquals("John.Doe3", result);
+        assertThat(username).isEqualTo("John.Doe");
     }
 
     @Test
-    @DisplayName("generateUsername should check both trainers and trainees")
-    void generateUsername_ShouldCheckBothTrainersAndTrainees() {
-        Trainee existingTrainee = new Trainee("Jane", "Smith");
-        existingTrainee.setUsername("Jane.Smith");
-
-        when(mockStorage.getAllTrainers()).thenReturn(List.of());
-        when(mockStorage.getAllTrainees()).thenReturn(List.of(existingTrainee));
-
-        String result = credentialsGenerator.generateUsername("Jane", "Smith");
-
-        assertEquals("Jane.Smith1", result);
+    void generateUsername_ShouldThrowException_WhenFirstNameNull() {
+        assertThatThrownBy(() -> credentialsGenerator.generateUsername(null, "Doe"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("First name and last name are required for username generation");
     }
 
     @Test
-    @DisplayName("generatePassword should return 10 character password")
-    void generatePassword_ShouldReturn10CharacterPassword() {
+    void generateUsername_ShouldThrowException_WhenLastNameNull() {
+        assertThatThrownBy(() -> credentialsGenerator.generateUsername("John", null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("First name and last name are required for username generation");
+    }
+
+    @Test
+    void generateUsername_ShouldThrowException_WhenFirstNameEmpty() {
+        assertThatThrownBy(() -> credentialsGenerator.generateUsername("", "Doe"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("First name and last name are required for username generation");
+    }
+
+    @Test
+    void generateUsername_ShouldThrowException_WhenLastNameEmpty() {
+        assertThatThrownBy(() -> credentialsGenerator.generateUsername("John", ""))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("First name and last name are required for username generation");
+    }
+
+    @Test
+    void generateUsername_ShouldThrowException_WhenBothNamesEmpty() {
+        assertThatThrownBy(() -> credentialsGenerator.generateUsername("  ", "  "))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("First name and last name are required for username generation");
+    }
+
+    @Test
+    void generatePassword_ShouldReturnPasswordOfCorrectLength() {
         String password = credentialsGenerator.generatePassword();
-        assertEquals(10, password.length());
+
+        assertThat(password).hasSize(10);
     }
 
     @Test
-    @DisplayName("generatePassword should contain only valid characters")
-    void generatePassword_ShouldContainOnlyValidCharacters() {
-        String password = credentialsGenerator.generatePassword();
-        String validChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-
-        for (char c : password.toCharArray()) {
-            assertTrue(validChars.indexOf(c) >= 0,
-                    "Password contains invalid character: " + c);
-        }
-    }
-
-    @Test
-    @DisplayName("generatePassword should generate different passwords")
-    void generatePassword_ShouldGenerateDifferentPasswords() {
+    void generatePassword_ShouldReturnDifferentPasswords() {
         String password1 = credentialsGenerator.generatePassword();
         String password2 = credentialsGenerator.generatePassword();
         String password3 = credentialsGenerator.generatePassword();
 
-        assertNotEquals(password1, password2);
-        assertNotEquals(password2, password3);
-        assertNotEquals(password1, password3);
-    }
-
-    @ParameterizedTest
-    @NullAndEmptySource
-    @ValueSource(strings = {"   ", "\t\n"})
-    @DisplayName("isUsernameUnique should return false for invalid username")
-    void isUsernameUnique_WithInvalidUsername_ShouldReturnFalse(String username) {
-        assertFalse(credentialsGenerator.isUsernameUnique(username));
+        assertThat(password1).isNotEqualTo(password2);
+        assertThat(password2).isNotEqualTo(password3);
+        assertThat(password1).isNotEqualTo(password3);
     }
 
     @Test
-    @DisplayName("isUsernameUnique should return true when username is unique")
-    void isUsernameUnique_WhenUnique_ShouldReturnTrue() {
-        when(mockStorage.getAllTrainers()).thenReturn(List.of());
-        when(mockStorage.getAllTrainees()).thenReturn(List.of());
+    void generatePassword_ShouldContainValidCharacters() {
+        String password = credentialsGenerator.generatePassword();
+        String validChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
-        assertTrue(credentialsGenerator.isUsernameUnique("unique.username"));
+        assertThat(password).matches("^[" + validChars + "]+$");
     }
 
     @Test
-    @DisplayName("isUsernameUnique should return false when trainer has username")
-    void isUsernameUnique_WhenTrainerHasUsername_ShouldReturnFalse() {
-        Trainer existingTrainer = new Trainer("John", "Doe");
-        existingTrainer.setUsername("john.doe");
+    void isUsernameUnique_ShouldReturnTrue_WhenUsernameNotExists() {
+        when(traineeDao.existsByUsername("unique.username")).thenReturn(false);
+        when(trainerDao.existsByUsername("unique.username")).thenReturn(false);
 
-        when(mockStorage.getAllTrainers()).thenReturn(List.of(existingTrainer));
-        when(mockStorage.getAllTrainees()).thenReturn(List.of());
+        boolean unique = credentialsGenerator.isUsernameUnique("unique.username");
 
-        assertFalse(credentialsGenerator.isUsernameUnique("john.doe"));
+        assertThat(unique).isTrue();
     }
 
     @Test
-    @DisplayName("isUsernameUnique should return false when trainee has username")
-    void isUsernameUnique_WhenTraineeHasUsername_ShouldReturnFalse() {
-        Trainee existingTrainee = new Trainee("Jane", "Smith");
-        existingTrainee.setUsername("jane.smith");
+    void isUsernameUnique_ShouldReturnFalse_WhenExistsInTrainees() {
+        when(traineeDao.existsByUsername("john.doe")).thenReturn(true);
+        when(trainerDao.existsByUsername("john.doe")).thenReturn(false);
 
-        when(mockStorage.getAllTrainers()).thenReturn(List.of());
-        when(mockStorage.getAllTrainees()).thenReturn(List.of(existingTrainee));
+        boolean unique = credentialsGenerator.isUsernameUnique("john.doe");
 
-        assertFalse(credentialsGenerator.isUsernameUnique("jane.smith"));
+        assertThat(unique).isFalse();
     }
 
     @Test
-    @DisplayName("isUsernameUnique should handle whitespace")
-    void isUsernameUnique_ShouldHandleWhitespace() {
-        when(mockStorage.getAllTrainers()).thenReturn(List.of());
-        when(mockStorage.getAllTrainees()).thenReturn(List.of());
+    void isUsernameUnique_ShouldReturnFalse_WhenExistsInTrainers() {
+        when(traineeDao.existsByUsername("jane.smith")).thenReturn(false);
+        when(trainerDao.existsByUsername("jane.smith")).thenReturn(true);
 
-        assertTrue(credentialsGenerator.isUsernameUnique("  unique.username  "));
+        boolean unique = credentialsGenerator.isUsernameUnique("jane.smith");
+
+        assertThat(unique).isFalse();
+    }
+
+    @Test
+    void isUsernameUnique_ShouldReturnFalse_WhenExistsInBoth() {
+        when(traineeDao.existsByUsername("duplicate")).thenReturn(true);
+        when(trainerDao.existsByUsername("duplicate")).thenReturn(true);
+
+        boolean unique = credentialsGenerator.isUsernameUnique("duplicate");
+
+        assertThat(unique).isFalse();
+    }
+
+    @Test
+    void isUsernameUnique_ShouldReturnFalse_WhenUsernameNull() {
+        boolean unique = credentialsGenerator.isUsernameUnique(null);
+
+        assertThat(unique).isFalse();
+    }
+
+    @Test
+    void isUsernameUnique_ShouldReturnFalse_WhenUsernameEmpty() {
+        boolean unique = credentialsGenerator.isUsernameUnique("");
+
+        assertThat(unique).isFalse();
+    }
+
+    @Test
+    void isUsernameUnique_ShouldTrimUsername() {
+        when(traineeDao.existsByUsername("username")).thenReturn(false);
+        when(trainerDao.existsByUsername("username")).thenReturn(false);
+
+        boolean unique = credentialsGenerator.isUsernameUnique("  username  ");
+
+        assertThat(unique).isTrue();
     }
 }

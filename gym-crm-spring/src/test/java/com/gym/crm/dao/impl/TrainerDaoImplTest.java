@@ -1,188 +1,218 @@
 package com.gym.crm.dao.impl;
 
-import com.gym.crm.storage.InMemoryStorage;
+import com.gym.crm.dao.TrainerDao;
+import com.gym.crm.dao.TrainingTypeDao;
+import com.gym.crm.entity.Trainer;
+import com.gym.crm.entity.TrainingType;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@ExtendWith(MockitoExtension.class)
-@DisplayName("TrainerDaoImpl Tests")
+@DataJpaTest
+@Import({TrainerDaoImpl.class, TrainingTypeDaoImpl.class})
+@ActiveProfiles("test")
+@Transactional
 class TrainerDaoImplTest {
 
-    @Mock
-    private InMemoryStorage mockStorage;
+    @Autowired
+    private TrainerDao trainerDao;
 
-    private TrainerDaoImpl trainerDao;
-    private com.gym.crm.entity.Trainer testTrainer;
-    private Map<Long, com.gym.crm.entity.Trainer> mockTrainerMap;
+    @Autowired
+    private TrainingTypeDao trainingTypeDao;
+
+    private Trainer testTrainer;
+    private TrainingType testSpecialization;
 
     @BeforeEach
     void setUp() {
-        trainerDao = new TrainerDaoImpl(mockStorage);
-        com.gym.crm.entity.TrainingType specialization = new com.gym.crm.entity.TrainingType("Cardio");
-        testTrainer = new com.gym.crm.entity.Trainer("Jane", "Smith", specialization);
-        testTrainer.setUserId(1L);
-        testTrainer.setUsername("jane.smith");
-        testTrainer.setPassword("password456");
+        testSpecialization = new TrainingType("Cardio");
+        testSpecialization = trainingTypeDao.create(testSpecialization);
 
-        mockTrainerMap = new ConcurrentHashMap<>();
+        testTrainer = new Trainer("John", "Trainer", testSpecialization);
+        testTrainer.setUsername("john.trainer");
+        testTrainer.setPassword("password123");
+        testTrainer.setIsActive(true);
     }
 
     @Test
-    @DisplayName("create should throw exception for null trainer")
-    void create_WithNullTrainer_ShouldThrowException() {
-        assertThrows(IllegalArgumentException.class, () -> trainerDao.create(null));
+    void create_ShouldPersistTrainer() {
+        Trainer created = trainerDao.create(testTrainer);
+        assertThat(created).isNotNull();
+        assertThat(created.getId()).isNotNull();
+        assertThat(created.getFirstName()).isEqualTo("John");
+        assertThat(created.getLastName()).isEqualTo("Trainer");
+        assertThat(created.getUsername()).isEqualTo("john.trainer");
+        assertThat(created.getSpecialization()).isEqualTo(testSpecialization);
+        assertThat(created.getSpecializationName()).isEqualTo("Cardio");
     }
 
     @Test
-    @DisplayName("create should generate ID when trainer has no ID")
-    void create_WithoutId_ShouldGenerateId() {
-        com.gym.crm.entity.Trainer trainerWithoutId = new com.gym.crm.entity.Trainer("John", "Doe");
-        when(mockStorage.generateTrainerId()).thenReturn(2L);
-
-        com.gym.crm.entity.Trainer result = trainerDao.create(trainerWithoutId);
-
-        assertEquals(2L, result.getUserId());
-        verify(mockStorage).generateTrainerId();
-        verify(mockStorage).storeTrainer(2L, trainerWithoutId);
+    void create_ShouldThrowException_WhenTrainerIsNull() {
+        assertThatThrownBy(() -> trainerDao.create(null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Trainer cannot be null");
     }
 
     @Test
-    @DisplayName("create should use existing ID when trainer has ID")
-    void create_WithExistingId_ShouldUseExistingId() {
-        com.gym.crm.entity.Trainer result = trainerDao.create(testTrainer);
+    void update_ShouldModifyExistingTrainer() {
+        Trainer created = trainerDao.create(testTrainer);
+        created.setFirstName("Jane");
+        created.setIsActive(false);
 
-        assertEquals(1L, result.getUserId());
-        verify(mockStorage, never()).generateTrainerId();
-        verify(mockStorage).storeTrainer(1L, testTrainer);
+        Trainer updated = trainerDao.update(created);
+        assertThat(updated.getFirstName()).isEqualTo("Jane");
+        assertThat(updated.getIsActive()).isFalse();
+        assertThat(updated.getId()).isEqualTo(created.getId());
+        assertThat(updated.getSpecialization()).isEqualTo(testSpecialization);
     }
 
     @Test
-    @DisplayName("update should throw exception for null trainer")
-    void update_WithNullTrainer_ShouldThrowException() {
-        assertThrows(IllegalArgumentException.class, () -> trainerDao.update(null));
+    void update_ShouldThrowException_WhenTrainerIsNull() {
+        assertThatThrownBy(() -> trainerDao.update(null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Trainer cannot be null");
     }
 
     @Test
-    @DisplayName("update should throw exception when trainer has no ID")
-    void update_WithoutId_ShouldThrowException() {
-        com.gym.crm.entity.Trainer trainerWithoutId = new com.gym.crm.entity.Trainer("John", "Doe");
-
-        assertThrows(IllegalArgumentException.class, () -> trainerDao.update(trainerWithoutId));
+    void update_ShouldThrowException_WhenTrainerIdIsNull() {
+        Trainer trainerWithoutId = new Trainer("Test", "User", testSpecialization);
+        assertThatThrownBy(() -> trainerDao.update(trainerWithoutId))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Trainer id cannot be null for update");
     }
 
     @Test
-    @DisplayName("update should throw exception when trainer not found")
-    void update_WhenTrainerNotFound_ShouldThrowException() {
-        when(mockStorage.getTrainers()).thenReturn(mockTrainerMap);
-        mockTrainerMap.clear();
-
-        assertThrows(RuntimeException.class, () -> trainerDao.update(testTrainer));
+    void findById_ShouldReturnTrainer_WhenExists() {
+        Trainer created = trainerDao.create(testTrainer);
+        Optional<Trainer> found = trainerDao.findById(created.getId());
+        assertThat(found).isPresent();
+        assertThat(found.get().getId()).isEqualTo(created.getId());
+        assertThat(found.get().getUsername()).isEqualTo("john.trainer");
     }
 
     @Test
-    @DisplayName("update should update existing trainer")
-    void update_WithExistingTrainer_ShouldUpdate() {
-        when(mockStorage.getTrainers()).thenReturn(mockTrainerMap);
-        mockTrainerMap.put(1L, testTrainer);
-
-        com.gym.crm.entity.Trainer result = trainerDao.update(testTrainer);
-
-        assertEquals(testTrainer, result);
-        verify(mockStorage).storeTrainer(1L, testTrainer);
+    void findById_ShouldReturnEmpty_WhenNotExists() {
+        Optional<Trainer> found = trainerDao.findById(999L);
+        assertThat(found).isEmpty();
     }
 
     @Test
-    @DisplayName("findById should return empty for null ID")
-    void findById_WithNullId_ShouldReturnEmpty() {
-        Optional<com.gym.crm.entity.Trainer> result = trainerDao.findById(null);
-        assertTrue(result.isEmpty());
+    void findById_ShouldReturnEmpty_WhenIdIsNull() {
+        Optional<Trainer> found = trainerDao.findById(null);
+        assertThat(found).isEmpty();
     }
 
     @Test
-    @DisplayName("findById should return empty when trainer not found")
-    void findById_WhenTrainerNotFound_ShouldReturnEmpty() {
-        when(mockStorage.getTrainer(999L)).thenReturn(null);
-
-        Optional<com.gym.crm.entity.Trainer> result = trainerDao.findById(999L);
-
-        assertTrue(result.isEmpty());
-    }
-
-    @Test
-    @DisplayName("findById should return trainer when found")
-    void findById_WhenTrainerExists_ShouldReturnTrainer() {
-        when(mockStorage.getTrainer(1L)).thenReturn(testTrainer);
-
-        Optional<com.gym.crm.entity.Trainer> result = trainerDao.findById(1L);
-
-        assertTrue(result.isPresent());
-        assertEquals(testTrainer, result.get());
-    }
-
-    @Test
-    @DisplayName("findAll should return all trainers")
     void findAll_ShouldReturnAllTrainers() {
-        List<com.gym.crm.entity.Trainer> expectedTrainers = List.of(testTrainer);
-        when(mockStorage.getAllTrainers()).thenReturn(expectedTrainers);
+        trainerDao.create(testTrainer);
 
-        List<com.gym.crm.entity.Trainer> result = trainerDao.findAll();
+        TrainingType strengthType = trainingTypeDao.create(new TrainingType("Strength"));
+        Trainer trainer2 = new Trainer("Jane", "Coach", strengthType);
+        trainer2.setUsername("jane.coach");
+        trainer2.setPassword("password456");
+        trainerDao.create(trainer2);
 
-        assertEquals(expectedTrainers, result);
+        List<Trainer> all = trainerDao.findAll();
+
+        assertThat(all).hasSize(2);
+        assertThat(all).extracting(Trainer::getUsername)
+                .containsExactlyInAnyOrder("john.trainer", "jane.coach");
     }
 
     @Test
-    @DisplayName("findByUsername should return empty for null username")
-    void findByUsername_WithNullUsername_ShouldReturnEmpty() {
-        Optional<com.gym.crm.entity.Trainer> result = trainerDao.findByUsername(null);
-        assertTrue(result.isEmpty());
+    void findByUsername_ShouldReturnTrainer_WhenExists() {
+        trainerDao.create(testTrainer);
+        Optional<Trainer> found = trainerDao.findByUsername("john.trainer");
+
+        assertThat(found).isPresent();
+        assertThat(found.get().getUsername()).isEqualTo("john.trainer");
+        assertThat(found.get().getFirstName()).isEqualTo("John");
     }
 
     @Test
-    @DisplayName("findByUsername should find trainer by username")
-    void findByUsername_WhenTrainerExists_ShouldReturnTrainer() {
-        when(mockStorage.getAllTrainers()).thenReturn(List.of(testTrainer));
-
-        Optional<com.gym.crm.entity.Trainer> result = trainerDao.findByUsername("jane.smith");
-
-        assertTrue(result.isPresent());
-        assertEquals(testTrainer, result.get());
+    void findByUsername_ShouldReturnEmpty_WhenNotExists() {
+        Optional<Trainer> found = trainerDao.findByUsername("nonexistent");
+        assertThat(found).isEmpty();
     }
 
     @Test
-    @DisplayName("existsById should return false for null ID")
-    void existsById_WithNullId_ShouldReturnFalse() {
-        assertFalse(trainerDao.existsById(null));
+    void findByUsername_ShouldReturnEmpty_WhenUsernameIsNull() {
+        Optional<Trainer> found = trainerDao.findByUsername(null);
+        assertThat(found).isEmpty();
     }
 
     @Test
-    @DisplayName("existsById should check storage")
-    void existsById_ShouldCheckStorage() {
-        when(mockStorage.getTrainers()).thenReturn(mockTrainerMap);
-        mockTrainerMap.put(1L, testTrainer);
-
-        boolean result = trainerDao.existsById(1L);
-
-        assertTrue(result);
+    void findByUsername_ShouldReturnEmpty_WhenUsernameIsEmpty() {
+        Optional<Trainer> found = trainerDao.findByUsername("");
+        assertThat(found).isEmpty();
     }
 
     @Test
-    @DisplayName("existsByUsername should check for username existence")
-    void existsByUsername_ShouldCheckForUsernameExistence() {
-        when(mockStorage.getAllTrainers()).thenReturn(List.of(testTrainer));
+    void existsById_ShouldReturnTrue_WhenTrainerExists() {
+        Trainer created = trainerDao.create(testTrainer);
+        boolean exists = trainerDao.existsById(created.getId());
+        assertThat(exists).isTrue();
+    }
 
-        assertTrue(trainerDao.existsByUsername("jane.smith"));
-        assertFalse(trainerDao.existsByUsername("nonexistent"));
+    @Test
+    void existsById_ShouldReturnFalse_WhenTrainerNotExists() {
+        boolean exists = trainerDao.existsById(999L);
+        assertThat(exists).isFalse();
+    }
+
+    @Test
+    void existsById_ShouldReturnFalse_WhenIdIsNull() {
+        boolean exists = trainerDao.existsById(null);
+        assertThat(exists).isFalse();
+    }
+
+    @Test
+    void existsByUsername_ShouldReturnTrue_WhenUsernameExists() {
+        trainerDao.create(testTrainer);
+        boolean exists = trainerDao.existsByUsername("john.trainer");
+        assertThat(exists).isTrue();
+    }
+
+    @Test
+    void existsByUsername_ShouldReturnFalse_WhenUsernameNotExists() {
+        boolean exists = trainerDao.existsByUsername("nonexistent");
+        assertThat(exists).isFalse();
+    }
+
+    @Test
+    void existsByUsername_ShouldReturnFalse_WhenUsernameIsNull() {
+        boolean exists = trainerDao.existsByUsername(null);
+        assertThat(exists).isFalse();
+    }
+
+    @Test
+    void existsByUsername_ShouldReturnFalse_WhenUsernameIsEmpty() {
+        boolean exists = trainerDao.existsByUsername("");
+        assertThat(exists).isFalse();
+    }
+
+    @Test
+    void shouldTrimWhitespaceFromFields() {
+        Trainer trainerWithSpaces = new Trainer(
+                "  Jane  ",
+                "  Coach  ",
+                testSpecialization
+        );
+        trainerWithSpaces.setUsername("jane.coach");
+        trainerWithSpaces.setPassword("password");
+        Trainer created = trainerDao.create(trainerWithSpaces);
+
+        assertThat(created.getFirstName()).isEqualTo("Jane");
+        assertThat(created.getLastName()).isEqualTo("Coach");
     }
 }
