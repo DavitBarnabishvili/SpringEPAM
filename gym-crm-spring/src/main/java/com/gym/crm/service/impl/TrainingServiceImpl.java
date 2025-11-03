@@ -24,15 +24,19 @@ public class TrainingServiceImpl implements TrainingService {
     private final TrainerDao trainerDao;
     private final TraineeDao traineeDao;
     private final ValidationService validationService;
+    private final WorkloadNotificationService workloadNotificationService;
+
 
     public TrainingServiceImpl(TrainingDao trainingDao,
                                TrainerDao trainerDao,
                                TraineeDao traineeDao,
-                               ValidationService validationService) {
+                               ValidationService validationService,
+                               WorkloadNotificationService workloadNotificationService) {
         this.trainingDao = trainingDao;
         this.trainerDao = trainerDao;
         this.traineeDao = traineeDao;
         this.validationService = validationService;
+        this.workloadNotificationService = workloadNotificationService;
     }
 
     @Override
@@ -72,6 +76,12 @@ public class TrainingServiceImpl implements TrainingService {
         logger.info("Successfully created training: '{}' with id: {} (trainee: {}, trainer: {})",
                 savedTraining.getTrainingName(), savedTraining.getId(),
                 savedTraining.getTraineeId(), savedTraining.getTrainerId());
+
+        try {
+            workloadNotificationService.notifyTrainingAdded(savedTraining);
+        } catch (Exception e) {
+            logger.error("Failed to notify workload service about new training", e);
+        }
 
         return savedTraining;
     }
@@ -298,6 +308,26 @@ public class TrainingServiceImpl implements TrainingService {
             } catch (UnauthorizedAccessException e2) {
                 throw new UnauthorizedAccessException("User can only create trainings for themselves");
             }
+        }
+    }
+
+    @Override
+    public void deleteTraining(String authenticatedUsername, Long id) {
+        logger.info("Deleting training with id: {} by user: {}", id, authenticatedUsername);
+
+        Optional<Training> trainingOpt = trainingDao.findById(id);
+        if (trainingOpt.isEmpty()) {
+            throw new RuntimeException("Training not found with id: " + id);
+        }
+
+        Training training = trainingOpt.get();
+        trainingDao.delete(training);
+        logger.info("Successfully deleted training with id: {}", id);
+
+        try {
+            workloadNotificationService.notifyTrainingDeleted(training);
+        } catch (Exception e) {
+            logger.error("Failed to notify workload service about deleted training", e);
         }
     }
 }

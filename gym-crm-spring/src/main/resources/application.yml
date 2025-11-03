@@ -1,7 +1,7 @@
 # Application Configuration
 spring:
   application:
-    name: Gym CRM System
+    name: Gym-CRM-System
 
   web:
     resources:
@@ -54,4 +54,4 @@ info:
 # Add Eureka configuration for microservices
 eureka:
   client:
-    enabled: false  # Default disabled, enable in specific profiles
+    enabled: false  # Default disabled, enabled in specific profiles

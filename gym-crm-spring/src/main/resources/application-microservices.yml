@@ -39,7 +39,6 @@ resilience4j:
           - java.net.SocketTimeoutException
           - java.io.IOException
 
-# Enable distributed tracing (optional)
 management:
   tracing:
     sampling:
