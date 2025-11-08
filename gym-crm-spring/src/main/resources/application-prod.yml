@@ -1,0 +1,77 @@
+# Production Environment Configuration
+server:
+  port: ${PORT:8080}
+
+spring:
+  datasource:
+    url: ${DATABASE_URL}
+    driver-class-name: org.h2.Driver
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+      minimum-idle: ${DB_MIN_IDLE:5}
+      connection-timeout: ${DB_CONNECTION_TIMEOUT:30000}
+
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+
+  h2:
+    console:
+      enabled: false
+
+# JWT Configuration - MUST be provided via environment
+jwt:
+  secret: ${JWT_SECRET}
+  expiration: ${JWT_EXPIRATION:86400000}
+
+# Security Configuration
+security:
+  brute-force:
+    max-attempts: ${SECURITY_MAX_ATTEMPTS:5}
+    lock-duration: ${SECURITY_LOCK_DURATION:1800000}
+
+# Logging Configuration
+logging:
+  level:
+    root: ERROR
+    com.gym.crm: WARN
+    com.gym.crm.security: INFO
+    org.springframework.web: ERROR
+    org.springframework.security: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%X{transactionId}] %-5level %logger{36} - %msg%n"
+  file:
+    name: ${LOG_PATH:/var/log}/gym-crm-prod.log
+    max-size: ${LOG_MAX_SIZE:10MB}
+    max-history: ${LOG_MAX_HISTORY:30}
+
+# Actuator - Minimal exposure for production
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus
+  endpoint:
+    health:
+      show-details: never
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+
+# Eureka configuration for production
+eureka:
+  client:
+    enabled: true
+    service-url:
+      defaultZone: ${EUREKA_SERVER_URL}
+    registry-fetch-interval-seconds: 5
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${spring.application.instance_id:${server.port}}
+    lease-renewal-interval-in-seconds: 10
+    lease-expiration-duration-in-seconds: 30

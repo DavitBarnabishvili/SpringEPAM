@@ -74,4 +74,6 @@ public interface TrainingService {
      * @return true if training exists, false otherwise
      */
     boolean trainingExists(Long id);
+
+    void deleteTraining(String authenticatedUsername, Long id);
 }

@@ -316,4 +316,66 @@ public class TrainingController {
                 })
                 .collect(Collectors.toList());
     }
+
+    @DeleteMapping("/trainings/{id}")
+    @Operation(summary = "Delete training", description = "Delete a training session")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Training deleted successfully"),
+            @ApiResponse(responseCode = "404", description = "Training not found"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @ApiResponse(responseCode = "403", description = "Forbidden - cannot delete past trainings")
+    })
+    public ResponseEntity<Void> deleteTraining(
+            @PathVariable Long id,
+            HttpServletRequest httpRequest) {
+
+        String transactionId = UUID.randomUUID().toString();
+        MDC.put("transactionId", transactionId);
+
+        String authenticatedUsername = (String) httpRequest.getAttribute("authenticatedUsername");
+
+        logger.info("Deleting training with id: {} by user: {}", id, authenticatedUsername);
+
+        try {
+            Optional<Training> trainingOpt = trainingService.findTrainingById(id);
+
+            if (trainingOpt.isEmpty()) {
+                throw new UserNotFoundException("Training not found with id: " + id);
+            }
+
+            Training training = trainingOpt.get();
+
+            // Check if user is authorized (must be either the trainee or trainer)
+            Optional<Trainee> traineeOpt = traineeService.findTraineeById(training.getTraineeId());
+            Optional<Trainer> trainerOpt = trainerService.findTrainerById(training.getTrainerId());
+
+            boolean isAuthorized = false;
+            if (traineeOpt.isPresent() && traineeOpt.get().getUsername().equals(authenticatedUsername)) {
+                isAuthorized = true;
+            }
+            if (trainerOpt.isPresent() && trainerOpt.get().getUsername().equals(authenticatedUsername)) {
+                isAuthorized = true;
+            }
+
+            if (!isAuthorized) {
+                logger.warn("Access denied: {} attempted to delete training id {} they're not involved in",
+                        authenticatedUsername, id);
+                throw new UserNotFoundException("You can only delete trainings where you are involved");
+            }
+
+            // Don't allow deletion of past trainings
+            if (training.getTrainingDate().isBefore(LocalDate.now())) {
+                logger.warn("Cannot delete past training: {}", id);
+                return ResponseEntity.status(403).build();
+            }
+
+            trainingService.deleteTraining(authenticatedUsername, id);
+
+            logger.info("Training deleted successfully: {}", id);
+            return ResponseEntity.ok().build();
+
+        } finally {
+            MDC.clear();
+        }
+    }
 }

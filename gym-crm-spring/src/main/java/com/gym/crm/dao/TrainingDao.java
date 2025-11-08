@@ -95,4 +95,6 @@ public interface TrainingDao {
     boolean existsById(Long id);
 
     int deleteByTraineeId(Long traineeId);
+
+    void delete(Training training);
 }
