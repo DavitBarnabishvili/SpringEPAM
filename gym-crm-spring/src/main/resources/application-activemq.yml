@@ -1,0 +1,18 @@
+spring:
+  activemq:
+    broker-url: ${ACTIVEMQ_BROKER_URL:tcp://localhost:61616}
+    user: ${ACTIVEMQ_USER:admin}
+    password: ${ACTIVEMQ_PASSWORD:admin}
+    packages:
+      trust-all: false
+      trusted: com.gym.crm.dto.request
+  jms:
+    template:
+      default-destination: trainer.workload.queue
+      delivery-mode: persistent
+      priority: 100
+      time-to-live: 3600000  # 1 hour
+
+activemq:
+  queues:
+    trainer-workload: trainer.workload.queue
