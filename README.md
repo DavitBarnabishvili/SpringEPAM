@@ -11,3 +11,5 @@ Task 4 - Spring Boot
 Task 5 - Spring Security
 
 Task 6 - Microservices
+
+Task 7 - Messaging
