@@ -7,6 +7,7 @@ import com.gym.crm.service.TrainerService;
 import com.gym.crm.service.messaging.WorkloadMessageProducer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
@@ -44,6 +45,7 @@ public class WorkloadNotificationService {
                 .trainingDate(training.getTrainingDate())
                 .trainingDuration(training.getTrainingDuration())
                 .actionType(TrainerWorkloadRequest.ActionType.ADD)
+                .transactionId(MDC.get("transactionId"))
                 .build();
 
         // Send message asynchronously
@@ -71,6 +73,7 @@ public class WorkloadNotificationService {
                 .trainingDate(training.getTrainingDate())
                 .trainingDuration(training.getTrainingDuration())
                 .actionType(TrainerWorkloadRequest.ActionType.DELETE)
+                .transactionId(MDC.get("transactionId"))
                 .build();
 
         messageProducer.sendWorkloadUpdate(request);
