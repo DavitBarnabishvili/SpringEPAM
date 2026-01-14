@@ -1,8 +1,9 @@
 package com.gym.crm.dto.request;
 
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
 import java.time.LocalDate;
 
 public class AddTrainingRequest {
@@ -20,7 +21,8 @@ public class AddTrainingRequest {
     private LocalDate trainingDate;
 
     @NotNull(message = "Training duration is required")
-    @Positive(message = "Training duration must be positive")
+    @Min(value = 15, message = "Training duration must be at least 15 minutes")
+    @Max(value = 480, message = "Training duration cannot exceed 480 minutes (8 hours)")
     private Integer trainingDuration;
 
     public AddTrainingRequest() {}

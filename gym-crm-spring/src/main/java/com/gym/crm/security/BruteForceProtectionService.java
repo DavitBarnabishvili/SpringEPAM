@@ -83,6 +83,17 @@ public class BruteForceProtectionService {
         return java.time.Duration.between(now, unlockTime).toMinutes();
     }
 
+    /**
+     * Clears all login attempt records. Used for testing purposes.
+     */
+    public void clearAllAttempts() {
+        int size = loginAttempts.size();
+        loginAttempts.clear();
+        if (size > 0) {
+            logger.debug("Cleared {} login attempt records", size);
+        }
+    }
+
     private static class AttemptRecord {
         int attempts = 0;
         LocalDateTime lastAttempt;
