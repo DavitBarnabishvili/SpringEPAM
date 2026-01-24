@@ -1,0 +1,76 @@
+services:
+  activemq:
+    image: apache/activemq-classic:5.18.3
+    container_name: activemq
+    ports:
+      - "61616:61616"
+      - "8161:8161"
+    environment:
+      - ACTIVEMQ_USERNAME=admin
+      - ACTIVEMQ_PASSWORD=admin
+    networks:
+      - gym-network
+
+
+  mongodb:
+    image: mongo:6.0
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - gym-network
+
+  # Main Gym CRM Microservice
+  gym-crm-main:
+    build:
+      context: ./gym-crm-spring
+      dockerfile: Dockerfile
+    container_name: gym-crm-main
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - ACTIVEMQ_BROKER_URL=tcp://activemq:61616
+    depends_on:
+      - activemq
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - gym-network
+
+  # Trainer Workload Microservice
+  trainer-workload:
+    build:
+      context: ../trainer-workload-service/trainer-workload-service
+      dockerfile: Dockerfile
+    container_name: trainer-workload
+    ports:
+      - "8082:8082"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - MONGODB_URI=mongodb://mongodb:27017/trainer_workload_db
+      - ACTIVEMQ_BROKER_URL=tcp://activemq:61616
+    depends_on:
+      - mongodb
+      - activemq
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8082/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - gym-network
+
+networks:
+  gym-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:

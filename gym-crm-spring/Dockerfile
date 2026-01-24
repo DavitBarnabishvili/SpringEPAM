@@ -30,5 +30,5 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health || exit 1
 
-# Run with local profile (disabled integrations: Eureka off, embedded ActiveMQ, H2 in-memory)
-ENTRYPOINT ["java", "-jar", "app.jar", "--spring.profiles.active=local"]
+# Default to docker profile (can be overridden via environment variable)
+ENTRYPOINT ["java", "-jar", "app.jar"]
