@@ -26,6 +26,11 @@ spring:
       settings:
         web-allow-others: false
 
+# ActiveMQ Queue Configuration
+activemq:
+  queues:
+    trainer-workload: trainer.workload.queue
+
 # JWT Configuration - Using environment variable with default
 jwt:
   secret: ${JWT_SECRET:1a48f384162d40fc7abee842ebd0ff94aa7895aa549605bd0b8f29ca456e5329}
