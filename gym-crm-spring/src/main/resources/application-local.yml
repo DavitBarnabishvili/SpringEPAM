@@ -1,0 +1,77 @@
+# Local Development Configuration
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: jdbc:h2:mem:gymcrm_local;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ''
+
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+      settings:
+        web-allow-others: false
+
+# JWT Configuration - Using environment variable with default
+jwt:
+  secret: ${JWT_SECRET:1a48f384162d40fc7abee842ebd0ff94aa7895aa549605bd0b8f29ca456e5329}
+  expiration: 3600000
+
+# Security Configuration
+security:
+  brute-force:
+    max-attempts: ${SECURITY_MAX_ATTEMPTS:3}
+    lock-duration: ${SECURITY_LOCK_DURATION:300000}
+
+# Logging Configuration
+logging:
+  level:
+    com.gym.crm: DEBUG
+    com.gym.crm.security: DEBUG
+    org.springframework.web: DEBUG
+    org.springframework.security: INFO
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%X{transactionId}] %-5level %logger{36} - %msg%n"
+
+# Actuator Configuration
+management:
+  endpoints:
+    web:
+      exposure:
+        include: '*'
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+  info:
+    env:
+      enabled: true
+    java:
+      enabled: true
+    os:
+      enabled: true
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+
+# Eureka disabled for local development
+eureka:
+  client:
+    enabled: false

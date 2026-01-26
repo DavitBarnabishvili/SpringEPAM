@@ -7,6 +7,8 @@ import org.springframework.stereotype.Component;
 
 import java.security.Key;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 
 @Component
 public class JwtUtil {
@@ -25,6 +27,18 @@ public class JwtUtil {
                 .setSubject(username)
                 .claim("role", role)
                 .claim("userId", userId)
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + expirationTime))
+                .signWith(key, SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    public String generateServiceToken() {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("role", "SERVICE");
+        return Jwts.builder()
+                .setClaims(claims)
+                .setSubject("INTER_SERVICE_COMMUNICATION")
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + expirationTime))
                 .signWith(key, SignatureAlgorithm.HS256)

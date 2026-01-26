@@ -7,6 +7,6 @@ import org.springframework.context.annotation.PropertySource;
 
 @Configuration
 @ComponentScan(basePackages = "com.gym.crm")
-@PropertySource("classpath:application.properties")
+@PropertySource("classpath:application.yml")
 @Import(JpaConfig.class)
 public class AppConfig {}

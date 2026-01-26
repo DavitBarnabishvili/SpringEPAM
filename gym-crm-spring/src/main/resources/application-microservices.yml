@@ -1,0 +1,45 @@
+# Microservices-specific configuration
+# Activate with: --spring.profiles.active=dev,microservices
+
+spring:
+  cloud:
+    discovery:
+      enabled: true
+
+# Feign Configuration
+feign:
+  client:
+    config:
+      default:
+        connectTimeout: ${FEIGN_CONNECT_TIMEOUT:5000}
+        readTimeout: ${FEIGN_READ_TIMEOUT:5000}
+        loggerLevel: ${FEIGN_LOG_LEVEL:BASIC}
+  circuitbreaker:
+    enabled: true
+
+# Resilience4j Circuit Breaker
+resilience4j:
+  circuitbreaker:
+    instances:
+      trainer-workload:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        permittedNumberOfCallsInHalfOpenState: 3
+        slidingWindowType: COUNT_BASED
+        minimumNumberOfCalls: 5
+        waitDurationInOpenState: 5s
+        failureRateThreshold: 50
+        eventConsumerBufferSize: 10
+  retry:
+    instances:
+      trainer-workload:
+        maxAttempts: 3
+        waitDuration: 1000
+        retryExceptions:
+          - java.net.SocketTimeoutException
+          - java.io.IOException
+
+management:
+  tracing:
+    sampling:
+      probability: ${TRACE_SAMPLING_PROBABILITY:1.0}

@@ -53,7 +53,8 @@ class TrainingServiceImplTest {
                 trainingDao,
                 trainerDao,
                 traineeDao,
-                validationService
+                validationService,
+                null
         );
 
         testTrainee = new Trainee("John", "Doe", LocalDate.of(1990, 1, 1), "123 Test St");

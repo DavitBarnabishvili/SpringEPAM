@@ -257,4 +257,25 @@ public class TrainingDaoImpl implements TrainingDao {
 
         return deletedCount;
     }
+
+    @Override
+    public void delete(Training training) {
+        if (training == null) {
+            throw new IllegalArgumentException("Training cannot be null");
+        }
+
+        if (training.getId() == null) {
+            throw new IllegalArgumentException("Training ID cannot be null");
+        }
+
+        logger.debug("Deleting training with id: {}", training.getId());
+
+        Training managedTraining = entityManager.find(Training.class, training.getId());
+        if (managedTraining != null) {
+            entityManager.remove(managedTraining);
+            logger.info("Successfully deleted training with id: {}", training.getId());
+        } else {
+            logger.warn("Training not found for deletion with id: {}", training.getId());
+        }
+    }
 }
