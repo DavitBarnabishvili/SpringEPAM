@@ -1,0 +1,66 @@
+# Docker Profile Configuration
+
+server:
+  port: 8080
+
+spring:
+  # External ActiveMQ broker
+  activemq:
+    broker-url: ${ACTIVEMQ_BROKER_URL:tcp://localhost:61616}
+    user: admin
+    password: admin
+
+  # H2 in-memory database
+  datasource:
+    url: jdbc:h2:mem:gymcrm_docker;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ''
+
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+
+  h2:
+    console:
+      enabled: false
+
+# ActiveMQ Queue Configuration
+activemq:
+  queues:
+    trainer-workload: trainer.workload.queue
+
+# JWT
+jwt:
+  secret: ${JWT_SECRET:1a48f384162d40fc7abee842ebd0ff94aa7895aa549605bd0b8f29ca456e5329}
+  expiration: 3600000
+
+# Security
+security:
+  brute-force:
+    max-attempts: ${SECURITY_MAX_ATTEMPTS:3}
+    lock-duration: ${SECURITY_LOCK_DURATION:300000}
+
+# Logging
+logging:
+  level:
+    com.gym.crm: INFO
+    org.springframework.jms: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%X{transactionId}] %-5level %logger{36} - %msg%n"
+
+# Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+
+eureka:
+  client:
+    enabled: false
