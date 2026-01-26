@@ -9,6 +9,7 @@ import com.gym.crm.entity.Training;
 import com.gym.crm.entity.TrainingType;
 import com.gym.crm.exception.UnauthorizedAccessException;
 import com.gym.crm.service.TrainingService;
+import com.gym.crm.service.impl.WorkloadNotificationService;
 import com.gym.crm.util.ValidationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,6 +42,9 @@ class TrainingServiceImplTest {
     @Mock
     private ValidationService validationService;
 
+    @Mock
+    private WorkloadNotificationService workloadNotificationService;
+
     private TrainingService trainingService;
     private Training testTraining;
     private Trainee testTrainee;
@@ -54,7 +58,7 @@ class TrainingServiceImplTest {
                 trainerDao,
                 traineeDao,
                 validationService,
-                null
+                workloadNotificationService
         );
 
         testTrainee = new Trainee("John", "Doe", LocalDate.of(1990, 1, 1), "123 Test St");
