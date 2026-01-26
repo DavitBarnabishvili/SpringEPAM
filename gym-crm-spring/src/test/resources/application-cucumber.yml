@@ -1,0 +1,65 @@
+spring:
+  application:
+    name: Gym CRM System Cucumber Tests
+
+  config:
+    activate:
+      on-profile: cucumber
+
+  activemq:
+    broker-url: vm://localhost?broker.persistent=false
+    in-memory: true
+
+  datasource:
+    url: jdbc:h2:mem:cucumber_testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ''
+
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+
+  h2:
+    console:
+      enabled: false
+
+  jms:
+    template:
+      default-destination: trainer.workload.queue
+      delivery-mode: persistent
+      priority: 9
+      time-to-live: 3600000
+
+server:
+  port: 0
+
+jwt:
+  secret: cucumber-test-secret-key-for-jwt-token-generation-minimum-256-bits
+  expiration: 3600000
+
+security:
+  brute-force:
+    max-attempts: 3
+    lock-duration: 300000
+
+activemq:
+  queues:
+    trainer-workload: trainer.workload.queue
+
+logging:
+  level:
+    com.gym.crm: INFO
+    org.springframework: WARN
+    org.hibernate: WARN
+    io.cucumber: INFO
+
+management:
+  endpoints:
+    enabled-by-default: false
+
+eureka:
+  client:
+    enabled: false
