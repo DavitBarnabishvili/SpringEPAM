@@ -13,3 +13,9 @@ Task 5 - Spring Security
 Task 6 - Microservices
 
 Task 7 - Messaging
+
+Task 8 - NoSql
+
+Task 9 - Integration Testing
+
+Task 10 - Containerization
